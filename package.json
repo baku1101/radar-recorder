@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node src/server.mjs",
-    "test": "node --test --test-isolation=none test/core.test.mjs test/server.test.mjs test/live.test.mjs",
+    "test": "node --test --test-isolation=none test/core.test.mjs test/server.test.mjs test/live.test.mjs test/sync-clock.test.mjs",
     "test:ui": "node test/ui.mjs",
     "test:capture-ui": "node test/capture-ui.mjs"
   }

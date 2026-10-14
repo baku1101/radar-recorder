@@ -31,3 +31,11 @@ GUI試験は専用プロファイル・GPU無効・localhost限定で実施し�
 - raw ADC、FFT、FPGA、動画モデルの自動ラベル、行動認識性能。
 
 収録開始後は、実カメラの許可と映像を本人が確認し、開始側と終了側の目印を残してください。物理同期精度の確認は、ソフトウェアの読戻し照合と分けて行います。
+
+## 同期時計名の静的QA修正
+
+liveの数値軸はPC受信時刻を使っていましたが、同期の`radar_clock`とtraining.jsonのwarningsは元PC解読時刻の固定名でした。liveの名義を`pc_receive_time_relative_to_first_timed_record`に修正し、取込み/demoは従来の`original_pc_decode_time_relative_to_first_timed_event`を維持しました。liveではmetadata headerにも受信時計があるため、原点は最初の時刻付き保存レコードです。
+
+合成回帰6/6で、モード別の時計名・warnings、旧syncとsync_historyの補正、起動時復旧・HTTP・一式書出しの整合を確認しました。目印、offset、scale、drift、不確かさ、外挿、対応区間と保存連番は変わりません。旧名の補正でも確認日時を保持し、元受信記録・frames.jsonl・session-config.jsonのバイトが変わらないことを照合しました。全unit/HTTPは50/50を通過しました。
+
+この修正は時計metadataの訂正で、時刻の再計算や再同期ではありません。実カメラ・実センサーの追加収録は行っておらず、物理同期精度の確認状況は変わりません。

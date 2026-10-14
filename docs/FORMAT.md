@@ -69,4 +69,8 @@ bindは127.0.0.1のみ。CSKは別プロセスのインストール済みメー�
 
 ライブframeの`source_pc_decode_time`は元のtsから得た時計、`pc_receive_time`はこのアプリ/bridgeの受信callbackのUnix ms。`pc_receive_monotonic_time`はNodeまたはbridgeプロセスの単調nsで、そのbasisを明記する。元のts=0は機器時刻へ推定しない。
 
+同期metadataの`radar_clock`は、liveで`pc_receive_time_relative_to_first_timed_record`、取込み/demoで従来の`original_pc_decode_time_relative_to_first_timed_event`を使う。どちらも保存済み`pc_receive_time.value`と`time_range.first_pc_ms`を使った既存の数値軸に名義を合わせる。liveはmetadata headerもPC受信時計を持つため、最初の時刻付き保存レコードを原点とする。
+
+旧セッションの`sync`と`sync_history`を読む際は時計名を補正し、`radar_clock_metadata_correction`に旧名・mode・`metadata_only_no_refit`を残す。読取だけでは元manifestファイルへ書き込まず、通常保存・起動時復旧・一式書出しで補正を永続化する。目印・offset・scale・drift・確認日時・フレーム・元データ・実設定は変更しない。training.jsonのwarningsもliveのPC受信時刻と取込みの元PC解読時刻を区別する。
+
 直接収録では停止したセッション内の追記再開を拒否する。新セッションの`capture.resumed_from`に前のIDを残し、空白を別収録として保持する。中断時のdurable受信envelopeは復旧可能だが、未保存行や未保存動画の完全性は保証しない。完成には有効な検出イベント、動画分割の照合と結合が必要。ソフト時計の一致で同期目印を自動確定しない。

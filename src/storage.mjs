@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { AppError, sha256, UNKNOWN } from './adapters.mjs';
-import { fitSync, mapVideoTime } from './sync.mjs';
+import { fitSync, mapVideoTime, reconcileSyncClock } from './sync.mjs';
 
 export function atomicJson(file, value, beforeWrite = () => {}) {
   beforeWrite(path.basename(file));
@@ -23,13 +23,18 @@ const safeId = id => {
   return id;
 };
 const settingKeys = ['adc_sample_rate_hz', 'samples_per_chirp', 'chirps_per_frame', 'rx_antennas', 'rx_order', 'chirp_interval_s', 'frame_interval_s', 'frequency_range_hz', 'gain', 'averaging', 'preprocessing'];
+function reconcileManifestSyncClocks(manifest) {
+  manifest.sync = reconcileSyncClock(manifest.sync, manifest.mode);
+  if (Array.isArray(manifest.sync_history)) manifest.sync_history = manifest.sync_history.map(sync => reconcileSyncClock(sync, manifest.mode));
+  return manifest;
+}
 export class SessionStore {
   constructor(root, { beforeWrite = () => {} } = {}) { this.root = path.resolve(root); this.beforeWrite = beforeWrite; fs.mkdirSync(this.root, { recursive: true }); }
   dir(id) { return path.join(this.root, safeId(id)); }
   file(id, name) { return path.join(this.dir(id), name); }
-  save(manifest) { atomicJson(this.file(manifest.id, 'manifest.json'), manifest, this.beforeWrite); }
+  save(manifest) { atomicJson(this.file(manifest.id, 'manifest.json'), reconcileManifestSyncClocks(manifest), this.beforeWrite); }
   get(id) {
-    try { return JSON.parse(fs.readFileSync(this.file(id, 'manifest.json'), 'utf8')); }
+    try { return reconcileManifestSyncClocks(JSON.parse(fs.readFileSync(this.file(id, 'manifest.json'), 'utf8'))); }
     catch (error) { if (error.code === 'ENOENT') throw new AppError('SESSION_NOT_FOUND', 'セッションが見つかりません', 404); throw error; }
   }
   list() {
@@ -157,7 +162,7 @@ export class SessionStore {
     if (m.time_range.backwards_count) throw new AppError('CLOCK_BACKWARDS', 'PC時刻が逆行しています。初版では線形同期を止めます');
     if (['running', 'stopping'].includes(m.state)) throw new AppError('BUSY', '取込みを停止または完了してから同期してください', 409);
     if (m.sync) m.sync_history.push(m.sync);
-    m.sync = fitSync(anchors, m.time_range.duration_s, m.video?.duration_s);
+    m.sync = fitSync(anchors, m.time_range.duration_s, m.video?.duration_s, { mode: m.mode });
     this.save(m); return m;
   }
   addLabel(id, input, { importedCandidate = false } = {}) {
@@ -204,10 +209,13 @@ export class SessionStore {
       if (!selected.length) { excluded.push({ id: label.id, reason: 'no_valid_timed_detection_events' }); continue; }
       intervals.push({ ...label, start_radar_s: start.radar_s, end_radar_s: end.radar_s, start_uncertainty_s: start.uncertainty_s, end_uncertainty_s: end.uncertainty_s, extrapolated: start.extrapolated || end.extrapolated, receiver_sequences: selected.map(f => f.receiver_sequence) });
     }
-    return { schema_version: 1, session_id: id, subject: m.subject, scenario: m.scenario, split_group: m.split_group, mode: m.mode, data_kind: 'detections_not_raw_adc', interval_convention: '[start,end)', source: m.source, config: JSON.parse(fs.readFileSync(this.file(id, 'session-config.json'), 'utf8')), time_range: m.time_range, sync: m.sync, video: m.video, intervals, excluded, reviewed_label_count: m.labels.filter(x => ['confirmed', 'corrected'].includes(x.status)).length, warnings: ['物理同期精度は未実証。PC解読時刻と動画時刻の線形対応。', '機器側欠損はunknown。targetのsequence_numはpacket連番として検証されていない。', '被験者・セッション単位で分割する。重複窓を学習と評価にまたがせない。', ...(m.mode === 'demo' ? ['デモは合成データ。実機収録・学習性能の証拠にはしない。'] : []), ...(m.state !== 'completed' ? ['取込みは未完了。保存済みの範囲のみ書き出す。'] : [])], integrity: report, exported_at: new Date().toISOString() };
+    return { schema_version: 1, session_id: id, subject: m.subject, scenario: m.scenario, split_group: m.split_group, mode: m.mode, data_kind: 'detections_not_raw_adc', interval_convention: '[start,end)', source: m.source, config: JSON.parse(fs.readFileSync(this.file(id, 'session-config.json'), 'utf8')), time_range: m.time_range, sync: m.sync, video: m.video, intervals, excluded, reviewed_label_count: m.labels.filter(x => ['confirmed', 'corrected'].includes(x.status)).length, warnings: [m.mode === 'live' ? '物理同期精度は未実証。PC受信時刻と動画時刻の線形対応。' : '物理同期精度は未実証。PC解読時刻と動画時刻の線形対応。', '機器側欠損はunknown。targetのsequence_numはpacket連番として検証されていない。', '被験者・セッション単位で分割する。重複窓を学習と評価にまたがせない。', ...(m.mode === 'demo' ? ['デモは合成データ。実機収録・学習性能の証拠にはしない。'] : []), ...(m.state !== 'completed' ? ['取込みは未完了。保存済みの範囲のみ書き出す。'] : [])], integrity: report, exported_at: new Date().toISOString() };
   }
   exportFiles(id) {
     const dataset = this.dataset(id);
+    // Include the same corrected metadata in both training.json and the archived
+    // manifest. No anchors, coefficients, frames, or source clocks are changed.
+    this.save(this.get(id));
     atomicJson(this.file(id, 'training.json'), dataset, this.beforeWrite);
     atomicJson(this.file(id, 'readback-report.json'), dataset.integrity, this.beforeWrite);
     atomicJson(this.file(id, 'labels-review.json'), { revision: this.get(id).review_revision, labels: this.get(id).labels }, this.beforeWrite);
