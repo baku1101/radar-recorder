@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>レーダーレビュー</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/capture.js" defer></script></head>
+<body>
+<header><div class="brand"><span class="radar-icon" aria-hidden="true">◎</span><div><strong>レーダーレビュー</strong><span class="sub">収録し、確かめながら整える</span></div></div><div class="header-right"><span class="badge">0.2.0 · ローカル専用</span><button id="demo" class="secondary">デモで試す</button></div></header>
+<div class="notice"><strong>検出イベントとカメラの直接収録</strong><span>CSK UARTまたはローカルWebSocketの検出結果に対応します。raw ADC・FPGA・モデル自動ラベルは未対応です。収録データはこのPCに保存します。</span></div>
+<div id="message" class="message" role="status" aria-live="polite" hidden></div>
+<div class="layout">
+<aside>
+  <details id="capture-section" open><summary>直接収録する</summary>
+    <form id="capture-form">
+      <label>収録名<input id="capture-title" maxlength="200" placeholder="例：歩行の直接収録"></label>
+      <label>レーダーの接続<select id="capture-transport"><option value="csk_uart_installed_vendor_api">CSK USB / UART（公式1.1 API）</option><option value="local_websocket_events">ローカルWebSocketの検出出力</option></select></label>
+      <label id="capture-com-row">COMポート<input id="capture-com" value="COM10" pattern="[Cc][Oo][Mm][0-9]{1,3}"></label>
+      <label id="capture-url-row" hidden>出力URL<input id="capture-url" value="ws://127.0.0.1:8767" placeholder="ws://127.0.0.1:8767"></label>
+      <p class="muted small">カメラは開始操作で許可を求めます。音声は収録しません。CSKは現在の検出出力を読み、設定を書き換えません。</p>
+      <button id="capture-start" type="submit" class="primary wide">レーダー＋カメラを開始</button>
+    </form>
+    <button id="capture-stop" type="button" class="secondary wide" disabled>収録を停止して保存</button>
+    <button id="capture-resume" type="button" class="quiet wide" disabled>選択した収録から新しく再開</button>
+    <button id="capture-rescue" type="button" class="secondary wide" hidden>未保存の動画分割を取得</button>
+    <video id="live-preview" muted playsinline hidden aria-label="収録中のカメラ"></video>
+    <p id="capture-status" class="muted small" role="status">開始と終了に、動画とレーダーの両方で確認できる目印を残してください。</p>
+  </details>
+  <div class="section-title"><h2>記録</h2><button id="refresh" class="quiet">更新</button></div>
+  <div id="sessions" class="session-list" aria-label="保存した記録"></div>
+  <details id="new-section" open><summary>新しい記録を作る</summary>
+    <form id="create-form">
+      <label>記録名<input id="title" required maxlength="200" placeholder="例：歩行と静止の確認"></label>
+      <label>被験者ID<input id="subject" maxlength="200" placeholder="未入力は不明"></label>
+      <label>シナリオ<input id="scenario" maxlength="200" placeholder="例：開始→歩く→止まる"></label>
+      <label>分割グループ<input id="split" maxlength="200" placeholder="未割当"></label>
+      <label class="check"><input id="historical" type="checkbox"><span>10/9の診断情報を関連づける<br><small>BGT60CUTR13 / FW 0.4.5。現在の機器確認ではありません。</small></span></label>
+      <button type="submit" class="primary wide">記録を作成</button>
+    </form>
+  </details>
+  <p class="aside-note">本人確認した区間だけを学習用書出しに含めます。同期していない区間や時刻が不明なイベントは自動で補いません。</p>
+</aside>
+<main>
+<section id="empty" class="empty"><span class="empty-mark">◎</span><h1>記録のレビューを始める</h1><p>保存済みのレーダーJSONLと動画を取り込み、<br>2つの対応目印から時刻を合わせます。</p><p class="muted">動作を確認するなら、右上の「デモで試す」へ。</p></section>
+<div id="workspace" hidden>
+  <div class="record-heading"><div><div id="mode-badge" class="eyebrow"></div><h1 id="record-title"></h1><p id="record-meta" class="muted"></p></div><span id="state" class="state"></span></div>
+  <section class="card import-card">
+    <div class="section-title"><h2><span class="step">1</span> ファイルを取り込む</h2><span id="source-name" class="muted small"></span></div>
+    <div class="import-grid">
+      <div><label>レーダーファイルの形式<select id="radar-format"><option value="jsonl">同梱1.1の保存済みJSONL</option><option value="diagnostic">既存ログから抽出した診断サンプルJSON</option></select></label><label>レーダーファイル<input id="radar-file" type="file" accept=".jsonl,.json"></label><button id="import-radar" class="secondary">JSONLを取り込む</button></div>
+      <div><label>既存の動画<input id="video-file" type="file" accept="video/mp4,video/webm,video/quicktime,.m4v,.mov"></label><p class="muted small">MP4 / WebM / MOV。ブラウザーが再生できる動画を使用してください。上限は各256 MiB。</p><button id="import-video" class="secondary">動画を取り込む</button></div>
+    </div>
+    <div class="control-row"><button id="start" class="primary">取込みを開始 / 再開</button><button id="stop" class="secondary">取込みを停止</button><button id="verify" class="quiet">読み戻しを検証</button><span id="verification" class="muted small"></span></div>
+    <div class="stats"><div><span>保存レコード</span><strong id="count">0</strong></div><div><span>元PC時刻の範囲</span><strong id="duration">不明</strong></div><div><span>時刻・形式の警告</span><strong id="errors">0</strong></div><div><span>機器側の欠損</span><strong>不明</strong></div></div>
+    <details><summary>機器・設定・保存の情報</summary><pre id="provenance"></pre></details>
+  </section>
+  <section class="card review-card">
+    <div class="section-title"><h2>動画とレーダーを確認</h2><span id="video-name" class="muted small">動画未登録</span></div>
+    <div class="preview-grid"><div class="video-wrap"><video id="video" controls preload="metadata" playsinline aria-label="取り込んだ動画"></video><p id="video-error" class="muted small">既存の動画を取り込んでください。</p></div><div class="radar-preview"><div class="section-title"><h3>検出距離の推移</h3><span id="chart-caption" class="muted small"></span></div><canvas id="chart" width="680" height="300" aria-label="元PC時刻を基準にした検出距離"></canvas><p class="muted small">横軸は元PCの解読時刻からの秒。取得時刻・物理同期精度は未確認です。</p><div class="current-time"><span id="video-time">動画 0.000 s</span><span id="radar-time">対応レーダー時刻：未同期</span></div></div></div>
+  </section>
+  <section class="card">
+    <div class="section-title"><h2><span class="step">2</span> 2つの目印で時刻を合わせる</h2><span id="sync-status" class="muted small">未同期</span></div>
+    <p class="muted">レーダーと動画の両方で確認できた開始側・終了側の目印を入力します。時刻のずれと、時間経過によるずれを別々に記録します。</p>
+    <form id="sync-form"><div class="anchor-grid">
+      <div class="anchor"><h3>開始側の目印</h3><label>目印の内容<input id="note0" required placeholder="例：最初に近づいて止まった瞬間"></label><div class="two"><label>動画の秒<input id="v0" type="number" min="0" step="0.001" value="0" required></label><label>レーダーの秒<input id="r0" type="number" min="0" step="0.001" value="0" required></label></div><button id="mark0" type="button" class="quiet">現在の動画時刻を使う</button><div class="two"><label>動画の不確かさ ±秒<input id="vu0" type="number" min="0" step="0.001" value="0.1" required></label><label>レーダーの不確かさ ±秒<input id="ru0" type="number" min="0" step="0.001" value="0.1" required></label></div></div>
+      <div class="anchor"><h3>終了側の目印</h3><label>目印の内容<input id="note1" required placeholder="例：最後に近づいて止まった瞬間"></label><div class="two"><label>動画の秒<input id="v1" type="number" min="0" step="0.001" required></label><label>レーダーの秒<input id="r1" type="number" min="0" step="0.001" required></label></div><button id="mark1" type="button" class="quiet">現在の動画時刻を使う</button><div class="two"><label>動画の不確かさ ±秒<input id="vu1" type="number" min="0" step="0.001" value="0.1" required></label><label>レーダーの不確かさ ±秒<input id="ru1" type="number" min="0" step="0.001" value="0.1" required></label></div></div>
+    </div><div class="control-row"><button class="primary" type="submit">対応時刻を保存</button><p class="muted small">不確かさは本人が見積もった目印の範囲です。通信遅延や非線形な時計ずれは不明のまま残します。</p></div></form>
+    <div id="sync-result" class="sync-result" hidden></div>
+  </section>
+  <section class="card">
+    <div class="section-title"><h2><span class="step">3</span> 区間ラベルを本人レビュー</h2><span id="label-progress" class="muted small"></span></div>
+    <p class="muted">行動名は日本語で入力できます。「その他」「不明」も使えます。開始・終了は実際の動作を動画で確認してください。</p>
+    <label>使う行動名（1行に1つ）<textarea id="action-names" rows="2" placeholder="歩く&#10;立ち止まる&#10;その他&#10;不明"></textarea></label><div id="action-chips" class="chips"></div>
+    <form id="label-form" class="label-add"><label>種類<input id="label-name" required maxlength="200" placeholder="例：歩く" list="actions"></label><datalist id="actions"></datalist><label>分類<select id="label-channel"><option value="current_action">現在の行動</option><option value="context">過去の文脈</option><option value="quality">品質・不明区間</option></select></label><label>開始秒<input id="label-start" type="number" min="0" step="0.001" value="0" required></label><label>終了秒<input id="label-end" type="number" min="0" step="0.001" required></label><button class="secondary" type="submit">区間を追加</button></form>
+    <div class="control-row"><button id="label-mark-start" class="quiet">現在位置を区間開始に</button><button id="label-mark-end" class="quiet">現在位置を区間終了に</button></div>
+    <div id="label-list" class="label-list"></div>
+    <details><summary>候補JSONの取込み・自動ラベルの対応状況</summary><p class="muted small">動画モデルの自動生成は未実装です。既存の候補JSONは未確認区間として取り込めます。候補には対象動画のSHA-256が必要です。形式はREADMEを参照してください。</p><label>候補JSON<input id="candidate-file" type="file" accept=".json"></label><button id="import-candidates" class="secondary">候補を取り込む</button><span class="badge">自動ラベル生成：未実装</span></details>
+  </section>
+  <section class="card export-card"><div><h2><span class="step">4</span> データを書き出す</h2><p class="muted">元JSONL、動画、設定、同期、レビュー履歴、確認済み区間、読み戻し結果をまとめて保存します。</p><p id="export-summary" class="small muted"></p></div><div class="export-buttons"><button id="export" class="primary">記録一式 .tar.gz</button><button id="export-json" class="secondary">学習用JSON</button><button id="export-csv" class="secondary">区間CSV</button></div></section>
+  <footer>実機収録・物理同期・行動認識の精度は未検証です。デモの成功を実機での成功とは扱いません。</footer>
+</div>
+</main></div>
+</body></html>

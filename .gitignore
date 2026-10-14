@@ -1,0 +1,14 @@
+data/
+evidence/
+test-output/
+.runtime/
+node_modules/
+*.log
+*.tmp
+.env
+.env.*
+fixtures/existing-diagnostic-samples.json
+test/check-existing-evidence.mjs
+*.zip
+*.tar.gz
+.DS_Store

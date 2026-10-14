@@ -1,0 +1,128 @@
+[
+  {
+    "LogTimeLocal": "2020-01-01 00:00:00",
+    "Timezone": "+00:00",
+    "provenance": "synthetic_fixture_no_device",
+    "Payload": {
+      "ts": 0,
+      "detections": {
+        "attributes": [
+          "range_m",
+          "azimuth_deg",
+          "elevation_deg",
+          "magnitude_dBFS",
+          "speed_mps",
+          "rx_idx",
+          "range_bin",
+          "doppler_bin",
+          "sequence_num",
+          "type",
+          "seq_count_1",
+          "seq_count_2",
+          "ir_stat"
+        ],
+        "data": [
+          [
+            1.0,
+            0,
+            0,
+            -20,
+            0.1,
+            0,
+            10,
+            2,
+            2,
+            1,
+            1,
+            1,
+            0
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "LogTimeLocal": "2020-01-01 00:00:01",
+    "Timezone": "+00:00",
+    "provenance": "synthetic_fixture_no_device",
+    "Payload": {
+      "ts": 0,
+      "detections": {
+        "attributes": [
+          "range_m",
+          "azimuth_deg",
+          "elevation_deg",
+          "magnitude_dBFS",
+          "speed_mps",
+          "rx_idx",
+          "range_bin",
+          "doppler_bin",
+          "sequence_num",
+          "type",
+          "seq_count_1",
+          "seq_count_2",
+          "ir_stat"
+        ],
+        "data": [
+          [
+            1.2,
+            0,
+            0,
+            -20,
+            0.1,
+            0,
+            10,
+            2,
+            3,
+            1,
+            1,
+            1,
+            0
+          ]
+        ]
+      }
+    }
+  },
+  {
+    "LogTimeLocal": "2020-01-01 00:00:02",
+    "Timezone": "+00:00",
+    "provenance": "synthetic_fixture_no_device",
+    "Payload": {
+      "ts": 0,
+      "detections": {
+        "attributes": [
+          "range_m",
+          "azimuth_deg",
+          "elevation_deg",
+          "magnitude_dBFS",
+          "speed_mps",
+          "rx_idx",
+          "range_bin",
+          "doppler_bin",
+          "sequence_num",
+          "type",
+          "seq_count_1",
+          "seq_count_2",
+          "ir_stat"
+        ],
+        "data": [
+          [
+            1.4,
+            0,
+            0,
+            -20,
+            0.1,
+            0,
+            10,
+            2,
+            4,
+            1,
+            1,
+            1,
+            0
+          ]
+        ]
+      }
+    }
+  }
+]
