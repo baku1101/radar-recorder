@@ -38,10 +38,10 @@ test('hardware and automatic model APIs reject unsupported work without side eff
   const model = new VideoLabelAdapter(); assert.equal(model.capabilities().external_api, false); await assert.rejects(model.propose(), { code: 'AUTO_LABEL_UNAVAILABLE' });
 });
 test('exact bytes including BOM/CRLF/blanks, record order, count, settings and time range read back', async t => {
-  const store = setup(t), original = fs.readFileSync(new URL('../fixtures/demo.events.jsonl', import.meta.url), 'utf8');
+  const store = setup(t), original = fs.readFileSync(new URL('../fixtures/demo.events.jsonl', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const text = '\uFEFF' + original.replaceAll('\n', '\r\n\r\n'), m = source(store, text); await readAll(store, m.id);
   assert.equal(fs.readFileSync(store.file(m.id, 'raw.events.jsonl'), 'utf8'), text);
-  const r = store.verify(m.id); assert.equal(r.ok, true); assert.equal(r.count, 122); assert.equal(r.time_range.duration_s, 12); assert.equal(r.settings_verified, true); assert.equal(r.device_loss, 'unknown');
+  const r = store.verify(m.id); assert.equal(r.ok, true, JSON.stringify(r.failures)); assert.equal(r.count, 122); assert.equal(r.time_range.duration_s, 12); assert.equal(r.settings_verified, true); assert.equal(r.device_loss, 'unknown');
   const frames = store.frames(m.id); assert.equal(frames[0].data_kind, 'metadata'); assert.equal(frames[1].source_line, 3); assert.equal(frames.at(-1).receiver_sequence, 122);
 });
 test('raw source corruption and settings edits block readback and resume', async t => {

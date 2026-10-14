@@ -48,7 +48,7 @@ async function beginLiveCapture(resumedFrom = null) {
     const body = { transport: $('capture-transport').value, port: $('capture-com').value, url: $('capture-url').value, data_kind: 'detections', camera: runtime.camera, resumed_from: resumedFrom, request_id: uid() };
     await api(`/api/sessions/${m.id}/capture-start`, body);
     runtime.heartbeat = setInterval(async () => {
-      try { const response = await api(`/api/sessions/${runtime.id}/capture-heartbeat`, {}); if (response.state === 'error' || response.state === 'interrupted') { runtime.sourceFailed = true; await stopLiveCapture(); } }
+      try { const response = await api(`/api/sessions/${runtime.id}/capture-heartbeat`, {}); if (response.state !== 'running') { runtime.sourceFailed = true; await stopLiveCapture(); } }
       catch (error) { runtime.failure = error; await stopLiveCapture(true); }
     }, 3000);
     await refreshList(); await selectSession(m.id);

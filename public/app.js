@@ -2,6 +2,8 @@
 const $ = id => document.getElementById(id);
 const stateNames = { created: 'ファイル待ち', ready: '取込み待ち', running: '取込み中', stopping: '停止処理中', stopped: '停止・再開可', interrupted: '中断・再開可', completed: '取込み完了', error: '保存 / 読出し失敗' };
 const statusNames = { pending: '未確認', confirmed: '本人確認', corrected: '本人修正', rejected: '除外' };
+const liveStateNames = { created: '開始待ち', ready: '接続準備中', running: '収録中', stopping: '停止処理中', stopped: '動画保存待ち', interrupted: '収録中断', completed: '収録を保存済み', error: '収録 / 保存失敗' };
+const stateLabel = item => (item.mode === 'live' ? liveStateNames : stateNames)[item.state];
 let token, selected, current, configuration, frames = [], busy = false, videoKey = '', labelsKey = '', pollTimer, sessions = [], previewRequest = 0;
 const fixed = x => typeof x === 'number' ? x.toFixed(3) : '不明';
 const uid = () => crypto.randomUUID();
@@ -40,7 +42,7 @@ function renderList() {
   for (const item of sessions) {
     const button = document.createElement('button'); button.className = 'session-item' + (item.id === selected ? ' active' : '');
     const name = document.createElement('span'); name.className = 'name'; name.textContent = item.title;
-    const summary = document.createElement('span'); summary.className = 'summary'; summary.textContent = `${item.mode === 'demo' ? 'デモ · ' : ''}${stateNames[item.state]} · ${item.count}件`;
+    const summary = document.createElement('span'); summary.className = 'summary'; summary.textContent = `${item.mode === 'demo' ? 'デモ · ' : ''}${stateLabel(item)} · ${item.count}件`;
     button.append(name, summary); button.onclick = () => act(() => selectSession(item.id)); $('sessions').append(button);
   }
 }
@@ -60,7 +62,8 @@ async function renderSession(newSelection = false) {
   $('record-title').textContent = m.title;
   $('mode-badge').textContent = m.mode === 'live' ? '直接収録 · 検出イベントとカメラ · 物理同期精度は未検証' : m.mode === 'demo' ? 'デモ · 合成データ · 実機未使用' : m.source?.diagnostic ? '診断サンプル · 全件の収録データではありません' : '保存済みファイルの取込み';
   $('record-meta').textContent = `被験者 ${m.subject} / シナリオ ${m.scenario} / 分割 ${m.split_group}`;
-  $('state').textContent = stateNames[m.runtime_failure ? 'error' : m.state]; $('state').className = `state ${m.runtime_failure ? 'error' : m.state}`;
+  $('state').textContent = stateLabel({ ...m, state: m.runtime_failure ? 'error' : m.state }); $('state').className = `state ${m.runtime_failure ? 'error' : m.state}`;
+  $('clock-caption').textContent = m.mode === 'live' ? '横軸はこのアプリのPC受信時刻からの秒。機器取得時刻・物理同期精度は未確認です。' : '横軸は元PCの解読時刻からの秒。取得時刻・物理同期精度は未確認です。';
   if (m.last_error || m.runtime_failure) message((m.runtime_failure ?? m.last_error).message, true);
   $('count').textContent = `${m.count} 件`;
   $('duration').textContent = typeof m.time_range.duration_s === 'number' ? `${fixed(m.time_range.duration_s)} s` : '不明';
@@ -172,7 +175,7 @@ $('refresh').onclick = () => act(async () => { await refreshList(); if (selected
 $('import-radar').onclick = () => act(async () => { const file = $('radar-file').files[0]; if (!file) throw new Error('レーダーファイルを選んでください'); if (file.size > 256 * 1024 * 1024) throw new Error('ファイル上限は256 MiBです'); await api(`/api/sessions/${selected}/radar?name=${encodeURIComponent(file.name)}&format=${$('radar-format').value}`, file, { raw: true }); await renderSession(); message('元ファイルを保存しました。「取込みを開始 / 再開」で読み込みます。'); });
 $('import-video').onclick = () => act(async () => { const file = $('video-file').files[0]; if (!file) throw new Error('動画を選んでください'); if (file.size > 256 * 1024 * 1024) throw new Error('ファイル上限は256 MiBです'); await api(`/api/sessions/${selected}/video?name=${encodeURIComponent(file.name)}`, file, { raw: true }); await renderSession(); message('動画を保存しました。再生を確認してください。'); });
 $('start').onclick = () => act(async () => { await api(`/api/sessions/${selected}/start`, {}); await renderSession(); message('保存済みファイルの取込みを開始しました'); });
-$('stop').onclick = () => act(async () => { await api(`/api/sessions/${selected}/stop`, {}); await renderSession(); message('取込みを停止しました。保存済みの次の行から再開できます。'); });
+$('stop').onclick = () => act(async () => { if (current?.mode === 'live' && captureRuntime?.id === selected) { await stopLiveCapture(); return; } await api(`/api/sessions/${selected}/stop`, {}); await renderSession(); message(current?.mode === 'live' ? 'レーダーを停止しました。収録画面で動画保存を完了してください。' : '取込みを停止しました。保存済みの次の行から再開できます。'); });
 $('verify').onclick = () => act(async () => { const r = await api(`/api/sessions/${selected}/verify`); $('verification').textContent = r.ok ? `${r.count}件 · 件数/順序/元データ/設定/時間範囲を確認` : `不一致: ${r.failures.join(', ')}`; message(r.ok ? '保存内容の読み戻しが一致しました。機器側欠損の検証結果ではありません。' : `読み戻し不一致: ${r.failures.join(', ')}`, !r.ok); });
 $('sync-form').onsubmit = event => { event.preventDefault(); act(async () => { const anchors = [0, 1].map(i => ({ video_s: Number($(`v${i}`).value), radar_s: Number($(`r${i}`).value), video_uncertainty_s: Number($(`vu${i}`).value), radar_uncertainty_s: Number($(`ru${i}`).value), note: $(`note${i}`).value })); await api(`/api/sessions/${selected}/sync`, { anchors }); await renderSession(); message('offsetとdrift、目印の不確かさを保存しました'); }); };
 for (let i = 0; i < 2; i++) $(`mark${i}`).onclick = () => { $(`v${i}`).value = ($('video').currentTime || 0).toFixed(3); };

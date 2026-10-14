@@ -26,7 +26,7 @@ try {
   const requests = await browser.evaluate('testCameraRequests'); assert.equal(requests.length, 1); assert.equal(requests[0].audio, false); check('Camera constraints request video only and never audio');
   await browser.waitFor('captureRuntime.saved >= 2', 15000); check('MediaRecorder chunks are saved while recording');
   await browser.screenshot(path.join(project, 'evidence', 'private-capture-synthetic-ui.png'));
-  await browser.evaluate("document.getElementById('capture-stop').click();document.getElementById('capture-stop').click()");
+  await browser.evaluate("document.getElementById('stop').click();document.getElementById('capture-stop').click()");
   await browser.waitFor("!captureRuntime && current?.state==='completed'", 15000);
   const m = app.store.get(id); assert.ok(m.count > 0 && m.capture.chunk_count >= 3); assert.equal(m.video.capture_started_by_this_app, true); assert.equal(m.capture.camera.audio, false); assert.equal(app.store.verify(id).ok, true);
   check('Double stop flushes the final video chunk and readback matches radar, video and configuration');

@@ -47,12 +47,12 @@
       <div><label>既存の動画<input id="video-file" type="file" accept="video/mp4,video/webm,video/quicktime,.m4v,.mov"></label><p class="muted small">MP4 / WebM / MOV。ブラウザーが再生できる動画を使用してください。上限は各256 MiB。</p><button id="import-video" class="secondary">動画を取り込む</button></div>
     </div>
     <div class="control-row"><button id="start" class="primary">取込みを開始 / 再開</button><button id="stop" class="secondary">取込みを停止</button><button id="verify" class="quiet">読み戻しを検証</button><span id="verification" class="muted small"></span></div>
-    <div class="stats"><div><span>保存レコード</span><strong id="count">0</strong></div><div><span>元PC時刻の範囲</span><strong id="duration">不明</strong></div><div><span>時刻・形式の警告</span><strong id="errors">0</strong></div><div><span>機器側の欠損</span><strong>不明</strong></div></div>
+    <div class="stats"><div><span>保存レコード</span><strong id="count">0</strong></div><div><span>時間範囲（PC時計）</span><strong id="duration">不明</strong></div><div><span>時刻・形式の警告</span><strong id="errors">0</strong></div><div><span>機器側の欠損</span><strong>不明</strong></div></div>
     <details><summary>機器・設定・保存の情報</summary><pre id="provenance"></pre></details>
   </section>
   <section class="card review-card">
     <div class="section-title"><h2>動画とレーダーを確認</h2><span id="video-name" class="muted small">動画未登録</span></div>
-    <div class="preview-grid"><div class="video-wrap"><video id="video" controls preload="metadata" playsinline aria-label="取り込んだ動画"></video><p id="video-error" class="muted small">既存の動画を取り込んでください。</p></div><div class="radar-preview"><div class="section-title"><h3>検出距離の推移</h3><span id="chart-caption" class="muted small"></span></div><canvas id="chart" width="680" height="300" aria-label="元PC時刻を基準にした検出距離"></canvas><p class="muted small">横軸は元PCの解読時刻からの秒。取得時刻・物理同期精度は未確認です。</p><div class="current-time"><span id="video-time">動画 0.000 s</span><span id="radar-time">対応レーダー時刻：未同期</span></div></div></div>
+    <div class="preview-grid"><div class="video-wrap"><video id="video" controls preload="metadata" playsinline aria-label="取り込んだ動画"></video><p id="video-error" class="muted small">既存の動画を取り込んでください。</p></div><div class="radar-preview"><div class="section-title"><h3>検出距離の推移</h3><span id="chart-caption" class="muted small"></span></div><canvas id="chart" width="680" height="300" aria-label="元PC時刻を基準にした検出距離"></canvas><p id="clock-caption" class="muted small">横軸はPC時計からの秒。機器取得時刻・物理同期精度は未確認です。</p><div class="current-time"><span id="video-time">動画 0.000 s</span><span id="radar-time">対応レーダー時刻：未同期</span></div></div></div>
   </section>
   <section class="card">
     <div class="section-title"><h2><span class="step">2</span> 2つの目印で時刻を合わせる</h2><span id="sync-status" class="muted small">未同期</span></div>
