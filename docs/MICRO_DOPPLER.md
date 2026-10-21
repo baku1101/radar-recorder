@@ -46,6 +46,10 @@ frameは `kind:raw_adc_frame`、単調な `sequence`、`frame_start_s`、`payloa
 
 FIFO callback時計は取得時計ではありません。frame配置の遅延・不確かさはunknownで、frame内の相対間隔だけが宣言されたTcに基づきます。PC受信時刻と混ぜません。UART bridgeはcallback由来のframe位置とpacket連番を別名で保存します。
 
+`time_discontinuities`は、宣言された前frameのsample区間末尾と次frame開始との間に空白があった回数です。正常なframe間休止も含み、転送欠落数ではありません。`source_sequence_discontinuities`は入力連番の飛びを別に数えます。どちらからも機器欠損の有無・個数を断定せず、`device_loss`はunknownのままです。各STFT窓は一つのframe内だけから生成します。
+
+PC到着時刻は元envelopeとframe metadataに保存し、STFT時刻やHz/m/s軸の計算には使いません。到着jitterやPC壁時計の逆行からsample時刻を補正しません。`frame_start_s`や必要なsample clock/timingがunknownなら、PC到着時刻で埋めず入力を拒否します。device capture timeと物理frame起点の不確かさは、未取得ならunknownを維持します。
+
 最大1MiB/frame、256MiB/記録、4096 frame。WebSocketはloopbackだけで、queue上限8件、16MiB、受信停止・overflowを明示します。アプリが保存しなかった受信数とsourceの欠番を分け、機器欠損はunknownを維持します。
 
 保存先は `data/raw-adc/<ID>/`。アップロード原本、source-config、要求/適用した解析設定、元envelope、各frameのbinとshape/timing/PC時計、SHA256、導出spectrumを保存します。元bytesをfsyncしてからworkerで計算し、未処理frameや中断を成功扱いにしません。raw記録は既存検出点・行動ラベル用datasetへ自動で混入させません。

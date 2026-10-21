@@ -65,3 +65,16 @@ liveの数値軸はPC受信時刻を使っていましたが、同期の`radar_c
 - 実機raw ADC取得0件。実測STFT、人の動作識別、長時間・物理同期は未検証。合成でのFFT/STFT成功と区別。
 
 privateの元bytes・device backup・メーカーsource/objects・スクリーンショットは公開repoへ含めない。GUI画面例は合成明示のものだけをprivate evidenceへ保存。
+
+## rawの空白・連番・CRC・保存再生を分離した合成QA
+
+追加後のunit/HTTPは83/83（既存62、raw15、packet6）、raw GUIは14/14。実機・COM・FW・測定mode・カメラには触れていない。
+
+- 正常連番でsample時間だけに空白を置くと、入力連番の不連続は0、sample時間空白は1。反対にsample時刻を連続させて入力連番だけを飛ばすと、それぞれ1と0。機器欠損は両方unknownを維持する。`time_discontinuities`は正常なframe間休止も数える既存fieldで、欠落数へ読み替えない。UIの名称を「宣言sample時間の空白（正常なframe間休止も含む）」とした。計算式・カウンタ数値は変更していない。
+- CRCだけを破損させたpacketを、正常連番のまま同じsequenceで再送するcaseでは、CRC error 1、出力packet 2、連番飛び0。連番飛びだけのcaseではCRC error 0・skipped bytes 0。noise・不正サイズ・末尾未完結も別に検査する。CRCは受信bytesの整合検査であり、sampleの物理的正しさや機器内の欠損を証明しない。
+- 候補と同じ128chirp×1RX×64sample、Tc 501.225µs、frame周期99.9614375msの**合成波形**を使う。3frameで128点窓は3列、64点窓/hop16は15列となり、全窓のstart/endが各frameのsample区間内に収まる。35.8046375msの正常空白をまたぐ窓は0、入力連番の不連続0、sample時間空白2。profileの実適用・連続chirpの実測ではない。
+- bytes・frame開始0/0.256秒・処理設定を固定し、PC到着だけを変える。均一到着の壁時計1000/1256ms・単調時計1000000/257000000nsと、壁時計9000/5000ms（逆行）・単調時計4000000000/98000000000nsを比較した。合成sample時計、入力元が宣言したdevice sample時計、FIFO callback由来時計の3契約すべてで、全スペクトル列と全軸が厳密一致し、到着値は別metadataに保持される。device契約の試験bytesも合成で、実機時計を確認した結果ではない。
+- frame開始やtime basisがunknown、またはPC到着時計をsample時計として指定した入力は拒否する。未取得のdevice capture time・物理frame起点の不確かさはunknown、`real_hardware_raw_verified`はfalseを維持する。FIFO callbackから物理取得時刻の正確さを主張しない。
+- 保存前の計算結果と保存JSONL、新しく開いたserviceでの全履歴再生を比較し、全10列の時間・窓境界・連番、全1280個の`power_db`、128点ずつのHz/m/s軸とその他の軸metadataが厳密一致する。末尾抜粋や一部binの比較では代用しない。
+
+これらはソフトの独立した条件と保存再生を検証するもので、実機raw取得0件・候補FW未書込み・復元書込み未試験という状態は変わらない。

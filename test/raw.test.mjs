@@ -45,13 +45,77 @@ test('complex IQ bytes keep their complex phase and use the declared sample scal
 });
 test('raw import preserves exact source bytes, raw binaries, timing/shape/settings and derived spectrum readback',async t=>{
  const store=setup(t),raw=new RawService(store.root);store.beforeCleanup=()=>raw.close();const staged=store.root+'/capture.raw.jsonl',text=[fixture.header,...fixture.frames].map(x=>JSON.stringify(x)).join('\r\n')+'\r\n';fs.writeFileSync(staged,text);
+ const expectedSpectra=fixture.frames.map(frame=>spectrum(frame));
+ const expectedColumns=expectedSpectra.flatMap((result,index)=>result.columns.map(column=>({...column,receiver_sequence:index+1,source_sequence:fixture.frames[index].sequence})));
+ const {columns:unusedColumns,...expectedAxes}=expectedSpectra.at(-1);
  const m=await raw.importFile(staged,{range_min_m:range-.01,range_max_m:range+.01});await raw.runtime.job;const final=raw.get(m.id);assert.equal(final.state,'completed');assert.equal(final.frame_count,2);assert.equal(final.processed_frames,2);assert.equal(final.column_count,10);assert.equal(raw.verify(m.id).ok,true);
  assert.equal(fs.readFileSync(raw.file(m.id,'source.raw.jsonl'),'utf8'),text);assert.deepEqual(fs.readFileSync(raw.file(m.id,'adc-000001.bin')),rawBytes(fixture.frames[0],c));const metadata=JSON.parse(fs.readFileSync(raw.file(m.id,'adc-000001.json'),'utf8'));assert.deepEqual(metadata.shape,[256,1,128]);assert.equal(metadata.time_basis,'synthetic_sample_clock');assert.equal(metadata.device_sequence,'unknown');
  const view=await raw.view(m.id,{start:.1,end:.4,tail:false});assert.ok(view.columns.every(x=>x.time_s>=.1&&x.time_s<=.4));assert.equal(view.manifest.real_hardware_raw_verified,false);assert.equal(view.manifest.device_loss,'unknown');assert.ok(raw.exportFiles(m.id).some(x=>x.name==='adc-000001.bin'));
+ const savedColumns=fs.readFileSync(raw.file(m.id,'spectrum.jsonl'),'utf8').trim().split('\n').map(line=>JSON.parse(line));
+ assert.deepEqual(savedColumns,expectedColumns,'every stored column, time/window boundary and power_db value must match pre-save computation');
+ assert.deepEqual(final.axes,expectedAxes,'all stored axes and their processing metadata must match pre-save computation');
+ await raw.close();const reopened=new RawService(store.root);store.beforeCleanup=()=>reopened.close();
+ const replay=await reopened.view(m.id,{tail:false});
+ assert.equal(replay.history_truncated,false);assert.equal(replay.display_omitted_columns,0);
+ assert.deepEqual(replay.columns,expectedColumns,'fresh-service replay must preserve all columns and all power bins exactly');
+ assert.deepEqual(replay.manifest.axes,expectedAxes,'fresh-service replay must preserve full frequency/velocity axes exactly');
  fs.appendFileSync(raw.file(m.id,'adc-000001.bin'),'tamper');assert.equal(raw.verify(m.id).ok,false);assert.throws(()=>raw.exportFiles(m.id),{code:'RAW_READBACK_FAILED'});
 });
-test('raw missing frames retain discontinuities and never coherently join unknown gaps',async t=>{
- const store=setup(t),raw=new RawService(store.root);store.beforeCleanup=()=>raw.close();const m=raw.create(fixture.header,requestProcessing,{});await raw.ingest(m.id,fixture.frames[0],JSON.stringify(fixture.frames[0]));const second={...fixture.frames[1],sequence:3,frame_start_s:2};await raw.ingest(m.id,second,JSON.stringify(second));const saved=raw.get(m.id);assert.equal(saved.source_sequence_discontinuities,1);assert.equal(saved.time_discontinuities,1);assert.equal(saved.device_loss,'unknown');const view=await raw.view(m.id);assert.equal(view.columns.filter(x=>x.time_s>.3&&x.time_s<2).length,0);await assert.rejects(raw.ingest(m.id,second,JSON.stringify(second)),{code:'RAW_SEQUENCE_ORDER'});
+test('normal sequence with an idle sample-time gap leaves source loss unknown and never creates gap-spanning windows',async t=>{
+ const store=setup(t),raw=new RawService(store.root);store.beforeCleanup=()=>raw.close();
+ const m=raw.create(fixture.header,requestProcessing,{}),second={...fixture.frames[1],frame_start_s:2};
+ for(const frame of [fixture.frames[0],second])await raw.ingest(m.id,frame,JSON.stringify(frame));
+ const saved=raw.get(m.id),view=await raw.view(m.id,{tail:false});
+ assert.equal(saved.source_sequence_discontinuities,0);assert.equal(saved.time_discontinuities,1);assert.equal(saved.device_loss,'unknown');
+ assert.equal(view.columns.length,10);
+ for(const column of view.columns){const start=column.source_sequence===0?0:2;assert.ok(column.window_start_s>=start);assert.ok(column.window_end_s<=start+.256);}
+ assert.equal(view.columns.filter(column=>column.window_start_s<2&&column.window_end_s>.256).length,0);
+});
+test('source sequence gap with contiguous sample times does not manufacture a sample-time gap or hardware loss count',async t=>{
+ const store=setup(t),raw=new RawService(store.root);store.beforeCleanup=()=>raw.close();
+ const m=raw.create(fixture.header,requestProcessing,{}),second={...fixture.frames[1],sequence:3};
+ for(const frame of [fixture.frames[0],second])await raw.ingest(m.id,frame,JSON.stringify(frame));
+ const saved=raw.get(m.id),view=await raw.view(m.id,{tail:false});
+ assert.equal(saved.source_sequence_discontinuities,1);assert.equal(saved.time_discontinuities,0);assert.equal(saved.device_loss,'unknown');
+ assert.deepEqual(view.columns.map(column=>column.source_sequence),[...Array(5).fill(0),...Array(5).fill(3)]);
+ assert.equal(view.columns[5].window_start_s,.256);
+ await assert.rejects(raw.ingest(m.id,second,JSON.stringify(second)),{code:'RAW_SEQUENCE_ORDER'});
+});
+test('candidate 128x1x64 timing keeps every STFT window inside its frame and preserves the normal 35.8046375ms idle gap',async t=>{
+ const store=setup(t),raw=new RawService(store.root);store.beforeCleanup=()=>raw.close();
+ // Independent synthetic ADC using the proposed timing, never a device capture or applied profile.
+ const cc=validateRawConfig({...c,sample_format:'uint16_le',samples_per_chirp:64,chirps_per_frame:128,sample_rate_hz:5e6,chirp_interval_s:.000501225,carrier_hz:60772770385.74219,chirp_slope_hz_per_s:33691406250000,sample_offset:32768,adc_full_scale:65535,timing_source:{reference:'synthetic candidate-timing regression; no sensor or firmware operation'}});
+ const period=.0999614375,span=128*cc.chirp_interval_s,header={...fixture.header,config:cc},frames=[];
+ for(let f=0;f<3;f++){const bytes=Buffer.alloc(cc.frame_bytes);for(let chirp=0;chirp<128;chirp++)for(let sample=0;sample<64;sample++)bytes.writeUInt16LE(Math.round(32768+16000*Math.cos(2*Math.PI*(8*sample/64+2*chirp/128))),(chirp*64+sample)*2);frames.push({kind:'raw_adc_frame',sequence:f,frame_start_s:f*period,payload_base64:bytes.toString('base64')});}
+ assert.ok(Math.abs(period-span-.0358046375)<1e-15);
+ for(const window_chirps of [128,64]){
+  const m=raw.create(header,{window_chirps,hop_chirps:window_chirps/4},{});
+  for(const frame of frames)await raw.ingest(m.id,frame,JSON.stringify(frame));
+  const view=await raw.view(m.id,{tail:false}),perFrame=1+(128-window_chirps)/(window_chirps/4);
+  assert.equal(view.columns.length,3*perFrame);assert.equal(view.manifest.source_sequence_discontinuities,0);assert.equal(view.manifest.time_discontinuities,2);assert.equal(view.manifest.device_loss,'unknown');
+  assert.ok(Math.abs(view.manifest.axes.frequency_bin_spacing_hz-1/(window_chirps*cc.chirp_interval_s))<1e-12);
+  for(const column of view.columns){const start=frames[column.source_sequence].frame_start_s;assert.ok(column.window_start_s>=start);assert.ok(column.window_end_s<=start+span+1e-15);assert.ok(Math.abs(column.window_end_s-column.window_start_s-window_chirps*cc.chirp_interval_s)<1e-15);}
+  for(let f=0;f<2;f++)assert.equal(view.columns.filter(column=>column.window_start_s<frames[f+1].frame_start_s&&column.window_end_s>frames[f].frame_start_s+span+1e-15).length,0);
+ }
+});
+test('PC arrival jitter cannot move sample-clock spectra and missing clock metadata is not filled from arrival time',async t=>{
+ const store=setup(t),raw=new RawService(store.root);store.beforeCleanup=()=>raw.close();
+ const arrivals=[
+  [{pc_receive_unix_ms:1000,pc_receive_monotonic_ns:'1000000'},{pc_receive_unix_ms:1256,pc_receive_monotonic_ns:'257000000'}],
+  [{pc_receive_unix_ms:9000,pc_receive_monotonic_ns:'4000000000'},{pc_receive_unix_ms:5000,pc_receive_monotonic_ns:'98000000000'}]
+ ];
+ for(const time_basis of ['synthetic_sample_clock','device_sample_clock','device_fifo_callback_clock_with_configured_chirp_spacing']){
+  // These source-declared clock variants still carry synthetic test bytes; no hardware verification is claimed.
+  const header={...fixture.header,config:{...c,time_basis,provenance:time_basis==='synthetic_sample_clock'?'synthetic':'real',physical_frame_origin_uncertainty_s:'unknown',timing_source:{reference:'synthetic test of source-declared clocks; not measured hardware'}}},views=[];
+  for(const received of arrivals){const m=raw.create(header,requestProcessing,{});for(let i=0;i<2;i++)await raw.ingest(m.id,fixture.frames[i],JSON.stringify(fixture.frames[i]),received[i]);const view=await raw.view(m.id,{tail:false});views.push(view);
+   assert.equal(view.manifest.time_discontinuities,0);assert.equal(view.manifest.device_loss,'unknown');assert.equal(view.manifest.real_hardware_raw_verified,false);assert.equal(view.manifest.config.physical_frame_origin_uncertainty_s,'unknown');
+   for(let i=0;i<2;i++){const metadata=JSON.parse(fs.readFileSync(raw.file(m.id,`adc-00000${i+1}.json`),'utf8'));assert.equal(metadata.pc_receive_unix_ms,received[i].pc_receive_unix_ms);assert.equal(metadata.pc_receive_monotonic_ns,received[i].pc_receive_monotonic_ns);assert.equal(metadata.frame_start_s,fixture.frames[i].frame_start_s);assert.equal(metadata.time_basis,time_basis);assert.equal(metadata.device_capture_time,'unknown');}
+  }
+  assert.deepEqual(views[0].columns,views[1].columns);assert.deepEqual(views[0].manifest.axes,views[1].manifest.axes);
+ }
+ const m=raw.create(fixture.header,requestProcessing,{}),missing={...fixture.frames[0],frame_start_s:'unknown'};
+ await assert.rejects(raw.ingest(m.id,missing,JSON.stringify(missing),arrivals[0][0]),{code:'RAW_FRAME_INVALID'});assert.equal(raw.get(m.id).frame_count,0);
+ for(const time_basis of ['unknown','pc_receive_time',undefined])assert.throws(()=>validateRawConfig({...c,time_basis}),{code:'RAW_TIMING_UNKNOWN'});
 });
 test('raw live backpressure and stop retain committed bytes and release acquisition reservation',async t=>{
  const store=setup(t);let readCount=0,stopped=false;const adapter={discarded:1,async open(){},read(){if(readCount<2){const frame=fixture.frames[readCount++];return {text:JSON.stringify(frame),pc_receive_unix_ms:Date.now(),pc_receive_monotonic_ns:'1'};}throw Object.assign(new Error('synthetic overflow'),{code:'RAW_BACKPRESSURE'});},async stop(){stopped=true;}};

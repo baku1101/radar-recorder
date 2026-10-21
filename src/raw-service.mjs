@@ -66,6 +66,8 @@ export class RawService {
     if(previous&&frame.sequence<=previous.source_sequence)throw new AppError('RAW_SEQUENCE_ORDER','raw入力連番が重複または逆行しています');
     if(previous&&frame.frame_start_s<previous.frame_start_s+m.config.chirps_per_frame*m.config.chirp_interval_s-1e-9)throw new AppError('RAW_TIME_OVERLAP','raw frameのsample時計が重複または逆行しています');
     if(previous&&frame.sequence!==previous.source_sequence+1)m.source_sequence_discontinuities++;
+    // Historical field name: counts gaps between declared sample spans, including normal frame idle time.
+    // It neither classifies a missing packet nor estimates hardware loss; source sequence gaps are separate.
     if(previous&&Math.abs(frame.frame_start_s-previous.frame_start_s-m.config.chirps_per_frame*m.config.chirp_interval_s)>1e-8)m.time_discontinuities++;
     const index=m.frame_count+1,bin=`adc-${String(index).padStart(6,'0')}.bin`,meta=`adc-${String(index).padStart(6,'0')}.json`;
     append(this.file(id,'raw.envelopes.jsonl'),{message_utf8:text,utf8_sha256:hash(text),...received});durable(this.file(id,bin),bytes);
