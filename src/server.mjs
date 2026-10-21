@@ -11,6 +11,9 @@ import { SessionController } from './controller.mjs';
 import { AppError, VideoLabelAdapter, JsonlFileAdapter } from './adapters.mjs';
 import { tarFiles } from './archive.mjs';
 import { prepareLive, saveVideoChunk, finishCamera, CAPTURE_LIMITS } from './capture-storage.mjs';
+import { DetectionMonitor } from './monitor.mjs';
+import { savedPreview } from './preview.mjs';
+import { PLOT_LIMITS } from '../public/plot-model.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), project = path.dirname(here);
 const MAX_UPLOAD = 256 * 1024 * 1024;
@@ -50,7 +53,9 @@ function serveVideo(req, res, file, mime) {
 }
 
 export async function createApp({ root = path.join(project, 'data', 'sessions'), port = 8765, delayMs = 10, storeOptions = {}, liveFactory, leaseMs } = {}) {
-  const store = new SessionStore(root, storeOptions), controller = new SessionController(store, { delayMs, liveFactory, leaseMs });
+  let monitor;
+  const store = new SessionStore(root, storeOptions), controller = new SessionController(store, { delayMs, liveFactory, leaseMs, canAcquireLive: () => !monitor?.busy });
+  monitor = new DetectionMonitor({ factory: liveFactory, leaseMs, canAcquire: () => !controller.liveReservation && ![...controller.runtime.values()].some(runtime => runtime.live) });
   const recoveryProblems = controller.initialize(), token = randomUUID(), model = new VideoLabelAdapter();
   let origin;
   const json = (res, body, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
@@ -63,7 +68,14 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
       if (!['GET', 'POST'].includes(req.method)) throw new AppError('METHOD_NOT_ALLOWED', '未対応の操作です', 405);
       if (req.method === 'POST' && req.headers['x-radar-token'] !== token) throw new AppError('LOCAL_TOKEN_REQUIRED', '画面を再読込みしてください', 403);
       const url = new URL(req.url, origin), parts = url.pathname.split('/').filter(Boolean);
-      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
+      if (req.method === 'POST' && url.pathname === '/api/monitor/start') {
+        const body = await jsonBody(req); assertKeys(body, ['transport', 'port', 'url', 'request_id', 'data_kind']);
+        if (typeof body.request_id !== 'string' || !body.request_id) throw new AppError('REQUEST_ID_REQUIRED', '表示開始操作のIDが必要です');
+        return json(res, await monitor.start(body));
+      }
+      if (req.method === 'POST' && url.pathname === '/api/monitor/stop') { assertKeys(await jsonBody(req), []); return json(res, await monitor.stop()); }
+      if (req.method === 'GET' && url.pathname === '/api/monitor') return json(res, monitor.view({ windowS: Number(url.searchParams.get('window_s') ?? 30), paused: url.searchParams.get('paused') === '1' }));
+      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], detection_monitor: { implemented: true, recording: false, camera: false, axes: ['speed_mps', 'doppler_bin'], full_spectrum: false, limits: PLOT_LIMITS }, camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'GET' && url.pathname === '/api/sessions') return json(res, { ...store.list(), runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'POST' && url.pathname === '/api/sessions') {
         const body = await jsonBody(req);
@@ -90,6 +102,11 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
           const all = store.frames(id), offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0)), limit = Math.min(5000, Math.max(1, Number(url.searchParams.get('limit') ?? 1000)));
           if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(limit)) throw new AppError('INVALID_PAGE', '件数指定が不正です');
           return json(res, { frames: all.slice(offset, offset + limit), total: all.length, next_offset: offset + limit < all.length ? offset + limit : null });
+        }
+        if (req.method === 'GET' && action === 'plot') {
+          const abort = new AbortController(); res.once('close', () => { if (!res.writableEnded) abort.abort(); });
+          const result = await savedPreview(store, id, { startS: Number(url.searchParams.get('start_s') ?? 0), endS: url.searchParams.has('end_s') ? Number(url.searchParams.get('end_s')) : undefined, tail: url.searchParams.get('tail') === '1', limit: Number(url.searchParams.get('limit') ?? 6000), signal: abort.signal });
+          if (!abort.signal.aborted) return json(res, result); return;
         }
         if (req.method === 'GET' && action === 'verify') return json(res, store.verify(id));
         if (req.method === 'GET' && action === 'configuration') return json(res, JSON.parse(fs.readFileSync(store.file(id, 'session-config.json'), 'utf8')));
@@ -172,9 +189,9 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
           });
         }
       }
-      if (req.method === 'GET' && ['/', '/app.js', '/capture.js', '/style.css'].includes(url.pathname)) {
+      if (req.method === 'GET' && ['/', '/app.js', '/capture.js', '/doppler.js', '/plot-model.mjs', '/style.css'].includes(url.pathname)) {
         const file = path.join(project, 'public', url.pathname === '/' ? 'index.html' : url.pathname.slice(1));
-        res.writeHead(200, { 'Content-Type': url.pathname.endsWith('.js') ? 'text/javascript; charset=utf-8' : url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        res.writeHead(200, { 'Content-Type': /\.m?js$/.test(url.pathname) ? 'text/javascript; charset=utf-8' : url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return fs.createReadStream(file).pipe(res);
       }
       throw new AppError('NOT_FOUND', 'ページが見つかりません', 404);
@@ -186,7 +203,7 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
   origin = `http://127.0.0.1:${server.address().port}`;
-  return { server, store, controller, origin, token, async close() { await controller.close(); await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); } };
+  return { server, store, controller, monitor, origin, token, async close() { await monitor.close(); await controller.close(); await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); } };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

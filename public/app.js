@@ -22,6 +22,7 @@ async function act(callback) {
 function updateControls() {
   document.querySelectorAll('button').forEach(button => { button.disabled = busy; });
   if (typeof captureControls === 'function') captureControls();
+  window.DopplerView?.updateControls();
   if (!current) return;
   const running = ['running', 'stopping'].includes(current.state);
   $('import-radar').disabled = busy || !!current.source;
@@ -94,13 +95,17 @@ async function renderSession(newSelection = false) {
   $('label-progress').textContent = `${m.labels.filter(x => ['confirmed', 'corrected'].includes(x.status)).length} / ${m.labels.length} 区間を本人レビュー済み`;
   const nextLabelsKey = `${m.id}:${m.review_revision}:${m.sync?.reviewed_at ?? ''}`;
   if (labelsKey !== nextLabelsKey) { labelsKey = nextLabelsKey; renderLabels(); }
-  const result = await api(`/api/sessions/${id}/frames?limit=5000`);
-  if (id !== selected || request !== previewRequest) return;
-  frames = result.frames; $('chart-caption').textContent = result.total > 5000 ? `先頭5000 / ${result.total}件を表示` : `${result.total}件を表示`;
+  window.dispatchEvent(new CustomEvent('radar-session', { detail: { session: m, selectedNew: newSelection } }));
   drawChart(); updateVideoTime(); updateControls();
   sessions = sessions.map(x => x.id === m.id ? m : x); renderList();
   clearTimeout(pollTimer);
   if (m.state === 'running' && !m.runtime_failure) pollTimer = setTimeout(() => renderSession().catch(e => message(e.message, true)), 750);
+}
+function showDistancePoints(points, id) {
+  if (!current || selected !== id) return;
+  frames = points.filter(point => point.range_m !== null).map(point => ({ data_kind: 'detections', pc_receive_time: { value: current.time_range.first_pc_ms + point.t_s * 1000 }, attributes: ['range_m'], data: [[point.range_m]], errors: [] }));
+  $('chart-caption').textContent = `表示範囲内 ${frames.length}点 / 保存 ${current.count}件`;
+  drawChart();
 }
 function mapped(videoS) {
   if (!current?.sync) return null;

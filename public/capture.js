@@ -2,10 +2,11 @@
 let captureRuntime = null, failedCapture = null;
 function captureControls() {
   const running = !!captureRuntime;
-  $('capture-start').disabled = busy || running;
+  const monitoring = window.DopplerView?.monitorBusy;
+  $('capture-start').disabled = busy || running || monitoring;
   $('capture-stop').disabled = !running || captureRuntime?.stopping;
-  $('capture-resume').disabled = busy || running || current?.mode !== 'live' || ['running', 'ready'].includes(current?.state);
-  $('capture-transport').disabled = running;
+  $('capture-resume').disabled = busy || running || monitoring || current?.mode !== 'live' || ['running', 'ready'].includes(current?.state);
+  $('capture-transport').disabled = running || monitoring;
   $('capture-com-row').hidden = $('capture-transport').value !== 'csk_uart_installed_vendor_api';
   $('capture-url-row').hidden = !$('capture-com-row').hidden;
 }
@@ -17,6 +18,7 @@ function cameraMime() {
 }
 async function beginLiveCapture(resumedFrom = null) {
   if (captureRuntime) return;
+  if (window.DopplerView?.monitorBusy) throw new Error('表示を止めて接続を解放してから収録を始めてください');
   const mime = cameraMime();
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('このブラウザーでカメラを利用できません');
   const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15, max: 15 } } });

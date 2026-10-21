@@ -1,5 +1,24 @@
 # 保存形式とAPIの最小契約
 
+## 0.3の検出点プレビューAPI
+
+モニターはセッションを作らず、ファイルへ保存しない。カメラやMediaRecorderも使わない。
+
+| 操作 | パスと入力 |
+| --- | --- |
+| 保存なしの表示開始 | POST `/api/monitor/start`。`transport`、`port`または`url`、`request_id`、`data_kind: detections` |
+| 受信状態と表示点 | GET `/api/monitor?window_s=30&paused=0`。`window_s`は0より大きく120以下 |
+| 表示停止・接続解放 | POST `/api/monitor/stop`。JSON `{}`。重複停止は同じ解放処理を待つ |
+| 保存ログの時刻範囲 | GET `/api/sessions/<id>/plot?start_s=0&end_s=30&tail=0&limit=6000` |
+
+POSTは既存のローカルtokenが必要。未対応のADC/FFT指定や外部WebSocket URLは拒否する。接続開始中から解放完了まで、モニターと直接収録の排他予約を保持する。GET monitorは画面の生存確認を兼ね、15秒途絶すると停止する。モニターの連続利用上限は1時間。
+
+点は`t_s`、`receiver_sequence`、`row_index`と元の`speed_mps`、`doppler_bin`、`range_m`、`magnitude_dBFS`、`type`、`rx_idx`を持つ。欠けた値はnull。属性の列順を参照し、PC時計が不明なレコードや不正な行から点を作らない。monitorの`t_s`は最初の受信レコードのUnix msからの差、保存ログは既存`time_range.first_pc_ms`からの差。`clock`に既存のモード別時計名を付ける。機器取得時刻として扱わない。
+
+`full_spectrum: false`、`device_loss: unknown`、`missing_values: not_interpolated_or_reconstructed`を返す。`display_omitted_points`は応答の点数上限による間引き、`display_evicted_points`はモニターの古い点の省略。受信の欠損とは区別する。モニターは12,000点、応答は6,000点まで。最新の元観測を残す決定的な間引きで、合成点や補間値は生成しない。
+
+保存ログは最大120秒の要求範囲を非同期に読む。収録中の`tail=1`では末尾2 MiBまでとし、先頭の部分行を捨てて`history_truncated`を示す。1行2 MiB超・不完全行・不正JSON・PC時計不明の件数も返す。64レコードごとにイベントループへ制御を返し、クライアント切断で読み取りを中止する。収録のcommit lockは取得せず、元記録・同期・ラベルを変更しない。
+
 ## session-config.json
 
 保存形式版/アプリ版、センサー・基板・FW・driverの識別と由来、転送方式、`requested`、adapterの`applied`、機器の`device_applied`を別記録。ADC sample rate/shape、アンテナ順、chirp/frame周期、周波数、ゲイン、平均化/前処理は未取得なら`unknown`。0.2ではファイル・CSK UART・ローカルWebSocketの`data_kind: detections`に対応。ADC/FFTとセンサー設定書込みは未対応。CSKでは`device_query`にFW/実設定の読取応答を保存する。

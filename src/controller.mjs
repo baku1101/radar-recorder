@@ -5,7 +5,7 @@ import { atomicJson, fileSha } from './storage.mjs';
 import { appendLive, recoverLive, sealLive, CAPTURE_LIMITS } from './capture-storage.mjs';
 import { performance } from 'node:perf_hooks';
 export class SessionController {
-  constructor(store, { delayMs = 10, liveFactory = defaultLiveFactory, leaseMs = 15000 } = {}) { this.store = store; this.delayMs = delayMs; this.liveFactory = liveFactory; this.leaseMs = leaseMs; this.runtime = new Map(); this.locks = new Map(); this.closed = false; this.liveReservation = null; }
+  constructor(store, { delayMs = 10, liveFactory = defaultLiveFactory, leaseMs = 15000, canAcquireLive = () => true } = {}) { this.store = store; this.delayMs = delayMs; this.liveFactory = liveFactory; this.leaseMs = leaseMs; this.canAcquireLive = canAcquireLive; this.runtime = new Map(); this.locks = new Map(); this.closed = false; this.liveReservation = null; }
   async lock(id, callback) {
     const previous = this.locks.get(id) ?? Promise.resolve();
     const current = previous.catch(() => {}).then(callback); this.locks.set(id, current);
@@ -26,7 +26,7 @@ export class SessionController {
       if (m.state === 'completed') return m;
       if (m.mode === 'live') {
         if (!m.capture || m.state !== 'ready') throw new AppError('NEW_LIVE_SESSION_REQUIRED', '直接収録の再開は新しいセッションで開始します。停止中の空白をつなげません', 409);
-        if (this.liveReservation || [...this.runtime.values()].some(r => r.live)) throw new AppError('LIVE_ALREADY_RUNNING', '直接収録は同時に1件だけ開始できます', 409);
+        if (!this.canAcquireLive() || this.liveReservation || [...this.runtime.values()].some(r => r.live)) throw new AppError('LIVE_ALREADY_RUNNING', 'モニターまたは別の直接収録が動作中です。停止してから開始してください', 409);
         this.liveReservation = id;
         const configuration = JSON.parse(fs.readFileSync(this.store.file(id, 'session-config.json'), 'utf8'));
         let adapter;

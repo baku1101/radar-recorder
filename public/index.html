@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>レーダーレビュー</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/capture.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>レーダーレビュー</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/capture.js" defer></script><script type="module" src="/doppler.js"></script></head>
 <body>
-<header><div class="brand"><span class="radar-icon" aria-hidden="true">◎</span><div><strong>レーダーレビュー</strong><span class="sub">収録し、確かめながら整える</span></div></div><div class="header-right"><span class="badge">0.2.0 · ローカル専用</span><button id="demo" class="secondary">デモで試す</button></div></header>
+<header><div class="brand"><span class="radar-icon" aria-hidden="true">◎</span><div><strong>レーダーレビュー</strong><span class="sub">収録し、確かめながら整える</span></div></div><div class="header-right"><span class="badge">0.3.0 · ローカル専用</span><button id="demo" class="secondary">デモで試す</button></div></header>
 <div class="notice"><strong>検出イベントとカメラの直接収録</strong><span>CSK UARTまたはローカルWebSocketの検出結果に対応します。raw ADC・FPGA・モデル自動ラベルは未対応です。収録データはこのPCに保存します。</span></div>
 <div id="message" class="message" role="status" aria-live="polite" hidden></div>
 <div class="layout">
@@ -14,6 +14,9 @@
       <label id="capture-com-row">COMポート<input id="capture-com" value="COM10" pattern="[Cc][Oo][Mm][0-9]{1,3}"></label>
       <label id="capture-url-row" hidden>出力URL<input id="capture-url" value="ws://127.0.0.1:8767" placeholder="ws://127.0.0.1:8767"></label>
       <p class="muted small">カメラは開始操作で許可を求めます。音声は収録しません。CSKは現在の検出出力を読み、設定を書き換えません。</p>
+      <button id="monitor-start" type="button" class="primary wide">表示を開始（保存・カメラなし）</button>
+      <button id="monitor-stop" type="button" class="secondary wide" disabled>表示を止めて接続を解放</button>
+      <p id="monitor-status" class="muted small" role="status">表示だけなら録画やカメラの許可は不要です。</p>
       <button id="capture-start" type="submit" class="primary wide">レーダー＋カメラを開始</button>
     </form>
     <button id="capture-stop" type="button" class="secondary wide" disabled>収録を停止して保存</button>
@@ -38,6 +41,24 @@
 </aside>
 <main>
 <section id="empty" class="empty"><span class="empty-mark">◎</span><h1>記録のレビューを始める</h1><p>保存済みのレーダーJSONLと動画を取り込み、<br>2つの対応目印から時刻を合わせます。</p><p class="muted">動作を確認するなら、右上の「デモで試す」へ。</p></section>
+<section id="doppler-card" class="card">
+  <div class="section-title"><div><div class="eyebrow">DETECTION DOPPLER</div><h2>ドップラーの時間変化</h2></div><span class="badge">検出点の表示</span></div>
+  <p class="muted small">受信した検出速度・ドップラービンを点で表示します。micro-Dopplerの全スペクトルは未取得です。</p>
+  <div class="doppler-controls">
+    <label>表示元<select id="doppler-source"><option value="session">選択中の記録</option><option value="monitor">ライブモニター</option></select></label>
+    <label>縦軸<select id="doppler-axis"><option value="speed_mps">検出速度 (m/s)</option><option value="doppler_bin">ドップラービン (bin)</option></select></label>
+    <label>表示幅<select id="doppler-window"><option value="10">10秒</option><option value="30" selected>30秒</option><option value="60">60秒</option><option value="120">120秒</option></select></label>
+    <label class="check"><input id="doppler-color" type="checkbox" checked><span>検出強度で色分け</span></label>
+    <button id="doppler-pause" class="secondary" type="button">表示を一時停止</button>
+  </div>
+  <p id="doppler-origin" class="muted small">表示元のPC時計を使います。機器取得時計は未確認です。</p>
+  <p id="doppler-paused" class="notice small" hidden>表示を一時停止しています。ライブ受信は継続し、表示用メモリの上限を超えた古い点は省略します。</p>
+  <canvas id="doppler-chart" width="920" height="340" aria-label="検出点の時刻と速度"></canvas>
+  <p id="doppler-summary" class="small" role="status">ライブ表示または合成デモを開始してください。</p>
+  <p id="doppler-legend" class="muted small"></p><p id="doppler-point" class="muted small">点にカーソルを合わせると元の値と連番を表示します</p>
+  <div class="doppler-playback"><button id="doppler-play" type="button" class="secondary">保存ログを再生</button><label>再生速度<select id="doppler-rate"><option value="0.5">0.5倍</option><option value="1" selected>1倍</option><option value="2">2倍</option></select></label><input id="doppler-seek" type="range" min="0" max="0" step="0.05" value="0" aria-label="保存ログの再生位置"><span id="doppler-position">0.00 s</span><button id="doppler-latest" type="button" class="quiet">最新の位置へ</button></div>
+  <details><summary>この表示で分かること・取得していないデータ</summary><p class="muted small">speed_mps、doppler_bin、magnitude_dBFSは元の検出結果の値です。速度の符号と接近・離反の対応、ビンからHzへの換算は未確認です。検出された点だけを表示し、欠けた速度や未検出の時間を補いません。全ドップラースペクトルやmicro-Dopplerの表示には、全ビンの時系列強度またはFFT/ADC/IQと、サンプル周期・chirp/frame構成・軸の情報を取得する経路が必要です。現在のCSK検出イベント経路では取得していません。</p></details>
+</section>
 <div id="workspace" hidden>
   <div class="record-heading"><div><div id="mode-badge" class="eyebrow"></div><h1 id="record-title"></h1><p id="record-meta" class="muted"></p></div><span id="state" class="state"></span></div>
   <section class="card import-card">

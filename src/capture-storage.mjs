@@ -18,7 +18,7 @@ export function prepareLive(store, id, input) {
   if (!c || !['video/webm', 'video/webm;codecs=vp8', 'video/webm;codecs=vp9'].includes(c.mime_type) || ![c.started_unix_ms, c.started_monotonic_ms, c.time_origin_ms].every(finite)) throw new AppError('CAMERA_METADATA_REQUIRED', 'カメラの開始時計とWebM形式を確認してください');
   const config = JSON.parse(fs.readFileSync(store.file(id, 'session-config.json'), 'utf8'));
   const fields = ['sensor', 'board', 'firmware_name', 'firmware_version', 'sensor_driver_version', 'application_version'];
-  config.app_version = '0.2.0'; config.connection = connection;
+  config.app_version = '0.3.0'; config.connection = connection;
   config.device = Object.fromEntries(fields.map(key => [key, typeof input.device?.[key] === 'string' ? input.device[key].slice(0, 200) : UNKNOWN]));
   config.device.provenance = 'user_declared_not_live_device_interrogation';
   config.requested = { data_kind: 'detections' }; config.applied = { data_kind: 'detections' }; config.device_applied = UNKNOWN;
