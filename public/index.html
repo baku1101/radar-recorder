@@ -1,9 +1,9 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>レーダーレビュー</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/capture.js" defer></script><script type="module" src="/doppler.js"></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>レーダーレビュー</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script><script src="/capture.js" defer></script><script type="module" src="/doppler.js"></script><script type="module" src="/micro.js"></script></head>
 <body>
-<header><div class="brand"><span class="radar-icon" aria-hidden="true">◎</span><div><strong>レーダーレビュー</strong><span class="sub">収録し、確かめながら整える</span></div></div><div class="header-right"><span class="badge">0.3.0 · ローカル専用</span><button id="demo" class="secondary">デモで試す</button></div></header>
-<div class="notice"><strong>検出イベントとカメラの直接収録</strong><span>CSK UARTまたはローカルWebSocketの検出結果に対応します。raw ADC・FPGA・モデル自動ラベルは未対応です。収録データはこのPCに保存します。</span></div>
+<header><div class="brand"><span class="radar-icon" aria-hidden="true">◎</span><div><strong>レーダーレビュー</strong><span class="sub">収録し、確かめながら整える</span></div></div><div class="header-right"><span class="badge">0.4.0 · ローカル専用</span><button id="demo" class="secondary">デモで試す</button></div></header>
+<div class="notice"><strong>検出イベントとカメラの直接収録</strong><span>CSK UARTまたはローカルWebSocketの検出結果に対応します。raw ADC/IQのFFT/STFT処理に対応。現在のCSK FWからのraw取得は未対応です。FPGA・モデル自動ラベルは未対応です。収録データはこのPCに保存します。</span></div>
 <div id="message" class="message" role="status" aria-live="polite" hidden></div>
 <div class="layout">
 <aside>
@@ -41,8 +41,24 @@
 </aside>
 <main>
 <section id="empty" class="empty"><span class="empty-mark">◎</span><h1>記録のレビューを始める</h1><p>保存済みのレーダーJSONLと動画を取り込み、<br>2つの対応目印から時刻を合わせます。</p><p class="muted">動作を確認するなら、右上の「デモで試す」へ。</p></section>
+<section id="micro-card" class="card">
+  <div class="section-title"><div><div class="eyebrow">RAW ADC / IQ → RANGE FFT → STFT</div><h2>生波形からのmicro-Doppler</h2></div><span class="badge">カメラ不要</span></div>
+  <p id="micro-hardware" class="notice small">現在のセンサーからのraw取得は未成立です。検出点を生波形として扱いません。</p>
+  <div class="doppler-controls">
+    <label>実rawの取得元<select id="micro-source"><option value="csk_current_firmware">現在のCSK FW（raw経路未対応）</option><option value="local_websocket_raw_adc">対応済みローカルraw配信</option></select></label>
+    <button id="micro-start" type="button" class="primary">実raw取得を開始</button><button id="micro-stop" type="button" class="secondary" disabled>raw取得/処理を停止</button>
+  </div>
+  <details><summary>ローカルraw配信の入力設定</summary><label>raw配信URL<input id="micro-url" value="ws://127.0.0.1:8768"></label><label>raw_adc_header JSON<textarea id="micro-header" rows="4" placeholder="実設定・shape・sample timing・時計の出典を含むJSON。unknownから軸を推定しません。"></textarea></label></details>
+  <details><summary>次回のFFT/STFT処理設定</summary><div class="doppler-controls"><label>窓長（chirp）<select id="micro-window"><option>16</option><option>32</option><option>64</option><option selected>128</option><option>256</option><option>512</option></select></label><label>hop（chirp）<input id="micro-hop" type="number" min="1" value="32"></label><label>距離の下限 m<input id="micro-rmin" type="number" min="0" step="0.01" value="0"></label><label>距離の上限 m<input id="micro-rmax" type="number" min="0" step="0.01" value="3"></label><label class="check"><input id="micro-static" type="checkbox">静止成分を除去</label></div><p class="muted small">処理設定は記録に保存します。センサー設定は変更しません。位相/物理方向は未校正です。</p></details>
+  <div class="control-row"><label>生ADC/IQの保存ログ<input id="micro-file" type="file" accept=".jsonl,.json"></label><button id="micro-import" type="button" class="secondary">raw JSONLを処理</button><button id="micro-demo" type="button" class="quiet">合成ADCで処理を確認（実機未使用）</button></div>
+  <div class="doppler-controls"><label>raw記録<select id="micro-session"><option value="">記録なし</option></select></label><label>縦軸<select id="micro-axis"><option value="frequency">ドップラー周波数 (Hz)</option><option value="velocity">速度 (m/s)</option></select></label><label>表示幅<select id="micro-span"><option value="2">2秒</option><option value="5" selected>5秒</option><option value="15">15秒</option><option value="60">60秒</option></select></label><label>色の下限 dB<input id="micro-floor" type="range" min="-140" max="-20" step="5" value="-80"></label><button id="micro-pause" type="button" class="secondary">表示だけ一時停止</button></div>
+  <p id="micro-provenance" class="small">実測rawと合成rawを区別して表示します。現在のCSK検出点はこの処理へ入力しません。</p>
+  <canvas id="micro-chart" width="920" height="360" aria-label="raw ADC/IQから計算するmicro-Doppler"></canvas>
+  <p id="micro-status" class="small" role="status">raw ADC/IQ入力待ち</p><p id="micro-detail" class="muted small"></p><p id="micro-point" class="muted small">色は元sampleから計算した電力です。検出点のmagnitude_dBFSとは別です。</p>
+  <div class="doppler-playback"><button id="micro-play" type="button" class="secondary">raw保存ログを再生</button><input id="micro-seek" type="range" min="0" max="0" step="0.01" value="0" aria-label="raw STFT再生位置"><span id="micro-position">0.00 s</span><button id="micro-latest" type="button" class="quiet">最新へ</button><button id="micro-verify" type="button" class="secondary">raw読戻し検証</button><button id="micro-export" type="button" class="secondary">元bytesとスペクトルを保存</button></div><p id="micro-verification" class="small"></p>
+</section>
 <section id="doppler-card" class="card">
-  <div class="section-title"><div><div class="eyebrow">DETECTION DOPPLER</div><h2>ドップラーの時間変化</h2></div><span class="badge">検出点の表示</span></div>
+  <div class="section-title"><div><div class="eyebrow">DETECTION EVENTS</div><h2>FW処理後の検出点の時間変化</h2></div><span class="badge">ADCではありません</span></div>
   <p class="muted small">受信した検出速度・ドップラービンを点で表示します。micro-Dopplerの全スペクトルは未取得です。</p>
   <div class="doppler-controls">
     <label>表示元<select id="doppler-source"><option value="session">選択中の記録</option><option value="monitor">ライブモニター</option></select></label>

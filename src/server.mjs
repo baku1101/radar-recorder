@@ -14,6 +14,7 @@ import { prepareLive, saveVideoChunk, finishCamera, CAPTURE_LIMITS } from './cap
 import { DetectionMonitor } from './monitor.mjs';
 import { savedPreview } from './preview.mjs';
 import { PLOT_LIMITS } from '../public/plot-model.mjs';
+import { RawService, RAW_HARDWARE_STATUS } from './raw-service.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), project = path.dirname(here);
 const MAX_UPLOAD = 256 * 1024 * 1024;
@@ -53,9 +54,11 @@ function serveVideo(req, res, file, mime) {
 }
 
 export async function createApp({ root = path.join(project, 'data', 'sessions'), port = 8765, delayMs = 10, storeOptions = {}, liveFactory, leaseMs } = {}) {
-  let monitor;
-  const store = new SessionStore(root, storeOptions), controller = new SessionController(store, { delayMs, liveFactory, leaseMs, canAcquireLive: () => !monitor?.busy });
-  monitor = new DetectionMonitor({ factory: liveFactory, leaseMs, canAcquire: () => !controller.liveReservation && ![...controller.runtime.values()].some(runtime => runtime.live) });
+  let monitor, raw;
+  const store = new SessionStore(root, storeOptions), controller = new SessionController(store, { delayMs, liveFactory, leaseMs, canAcquireLive: () => !monitor?.busy && !raw?.busy });
+  const recordingIdle=()=>!controller.liveReservation && ![...controller.runtime.values()].some(runtime=>runtime.live);
+  monitor = new DetectionMonitor({ factory: liveFactory, leaseMs, canAcquire: () => recordingIdle() && !raw?.busy });
+  raw = new RawService(root,{canAcquire:()=>recordingIdle()&&!monitor.busy,leaseMs});
   const recoveryProblems = controller.initialize(), token = randomUUID(), model = new VideoLabelAdapter();
   let origin;
   const json = (res, body, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
@@ -68,6 +71,16 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
       if (!['GET', 'POST'].includes(req.method)) throw new AppError('METHOD_NOT_ALLOWED', '未対応の操作です', 405);
       if (req.method === 'POST' && req.headers['x-radar-token'] !== token) throw new AppError('LOCAL_TOKEN_REQUIRED', '画面を再読込みしてください', 403);
       const url = new URL(req.url, origin), parts = url.pathname.split('/').filter(Boolean);
+      if(req.method==='GET'&&url.pathname==='/api/raw')return json(res,{sessions:raw.list(),hardware:RAW_HARDWARE_STATUS});
+      if(req.method==='POST'&&url.pathname==='/api/raw/start'){const body=await jsonBody(req);assertKeys(body,['transport','url','header','processing','request_id']);return json(res,await raw.start(body));}
+      if(req.method==='POST'&&url.pathname==='/api/raw/import'){let processing;if(url.searchParams.has('processing')){try{processing=JSON.parse(url.searchParams.get('processing'));}catch{throw new AppError('INVALID_JSON','processing JSON is invalid');}}fs.mkdirSync(raw.root,{recursive:true});const staged=path.join(raw.root,`upload-${randomUUID()}.tmp`);try{await upload(req,staged,64*1024*1024);return json(res,await raw.importFile(staged,processing));}finally{if(fs.existsSync(staged))fs.unlinkSync(staged);}}
+      if(parts[0]==='api'&&parts[1]==='raw'&&parts[2]){
+        const id=parts[2],action=parts[3];raw.get(id);
+        if(req.method==='GET'&&!action)return json(res,await raw.view(id,{start:Number(url.searchParams.get('start_s')??0),end:url.searchParams.has('end_s')?Number(url.searchParams.get('end_s')):Infinity,tail:url.searchParams.get('tail')!=='0'}));
+        if(req.method==='POST'&&action==='stop'){assertKeys(await jsonBody(req),[]);return json(res,await raw.stop(id));}
+        if(req.method==='GET'&&action==='verify')return json(res,raw.verify(id));
+        if(req.method==='GET'&&action==='export'){const files=raw.exportFiles(id);res.writeHead(200,{'Content-Type':'application/gzip','Content-Disposition':`attachment; filename="raw-adc-${id}.tar.gz"`});return await pipeline(Readable.from(tarFiles(files)),createGzip(),res);}
+      }
       if (req.method === 'POST' && url.pathname === '/api/monitor/start') {
         const body = await jsonBody(req); assertKeys(body, ['transport', 'port', 'url', 'request_id', 'data_kind']);
         if (typeof body.request_id !== 'string' || !body.request_id) throw new AppError('REQUEST_ID_REQUIRED', '表示開始操作のIDが必要です');
@@ -75,7 +88,7 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
       }
       if (req.method === 'POST' && url.pathname === '/api/monitor/stop') { assertKeys(await jsonBody(req), []); return json(res, await monitor.stop()); }
       if (req.method === 'GET' && url.pathname === '/api/monitor') return json(res, monitor.view({ windowS: Number(url.searchParams.get('window_s') ?? 30), paused: url.searchParams.get('paused') === '1' }));
-      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], detection_monitor: { implemented: true, recording: false, camera: false, axes: ['speed_mps', 'doppler_bin'], full_spectrum: false, limits: PLOT_LIMITS }, camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
+      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], detection_monitor: { implemented: true, recording: false, camera: false, axes: ['speed_mps', 'doppler_bin'], full_spectrum: false, limits: PLOT_LIMITS }, raw_micro_doppler: { implemented: true, inputs: ['raw_jsonl', 'synthetic_raw', 'local_websocket_raw_adc'], hardware: RAW_HARDWARE_STATUS, cross_frame_stitching: false }, camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'GET' && url.pathname === '/api/sessions') return json(res, { ...store.list(), runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'POST' && url.pathname === '/api/sessions') {
         const body = await jsonBody(req);
@@ -189,7 +202,7 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
           });
         }
       }
-      if (req.method === 'GET' && ['/', '/app.js', '/capture.js', '/doppler.js', '/plot-model.mjs', '/style.css'].includes(url.pathname)) {
+      if (req.method === 'GET' && ['/', '/app.js', '/capture.js', '/doppler.js', '/micro.js', '/plot-model.mjs', '/style.css'].includes(url.pathname)) {
         const file = path.join(project, 'public', url.pathname === '/' ? 'index.html' : url.pathname.slice(1));
         res.writeHead(200, { 'Content-Type': /\.m?js$/.test(url.pathname) ? 'text/javascript; charset=utf-8' : url.pathname.endsWith('.css') ? 'text/css; charset=utf-8' : 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return fs.createReadStream(file).pipe(res);
@@ -203,7 +216,7 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
   });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
   origin = `http://127.0.0.1:${server.address().port}`;
-  return { server, store, controller, monitor, origin, token, async close() { await monitor.close(); await controller.close(); await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); } };
+  return { server, store, controller, monitor, raw, origin, token, async close() { await raw.close(); await monitor.close(); await controller.close(); await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }); } };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

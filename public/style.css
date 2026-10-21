@@ -10,4 +10,11 @@
 #doppler-seek { flex:1 1 160px; min-width:80px; padding:0; }
 #doppler-summary,#doppler-point,#monitor-status { overflow-wrap:anywhere; }
 #monitor-stop { margin-top:8px; }
+#micro-chart { display:block; width:100%; height:auto; background:#071722; border-radius:10px; }
+#micro-card p { overflow-wrap:anywhere; }
+#micro-card .doppler-controls input[type=number] { max-width:115px; }
+#micro-seek { flex:1 1 130px; min-width:70px; padding:0; }
+#micro-card .notice { display:block; margin-bottom:15px; padding:12px; }
+#micro-card .control-row label { flex:1 1 200px; min-width:0; }
+#micro-file { max-width:100%; }
 @media(max-width:600px) { .doppler-controls label { flex:1 1 120px; } .doppler-playback { gap:8px; } #doppler-position { min-width:64px; } }

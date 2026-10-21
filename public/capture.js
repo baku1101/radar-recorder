@@ -2,7 +2,7 @@
 let captureRuntime = null, failedCapture = null;
 function captureControls() {
   const running = !!captureRuntime;
-  const monitoring = window.DopplerView?.monitorBusy;
+  const monitoring = window.DopplerView?.monitorBusy || window.MicroView?.hardwareBusy;
   $('capture-start').disabled = busy || running || monitoring;
   $('capture-stop').disabled = !running || captureRuntime?.stopping;
   $('capture-resume').disabled = busy || running || monitoring || current?.mode !== 'live' || ['running', 'ready'].includes(current?.state);
@@ -19,6 +19,7 @@ function cameraMime() {
 async function beginLiveCapture(resumedFrom = null) {
   if (captureRuntime) return;
   if (window.DopplerView?.monitorBusy) throw new Error('表示を止めて接続を解放してから収録を始めてください');
+  if (window.MicroView?.hardwareBusy) throw new Error('raw取得を停止してからカメラ収録を始めてください');
   const mime = cameraMime();
   if (!navigator.mediaDevices?.getUserMedia) throw new Error('このブラウザーでカメラを利用できません');
   const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 15, max: 15 } } });

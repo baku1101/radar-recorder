@@ -53,3 +53,15 @@ liveの数値軸はPC受信時刻を使っていましたが、同期の`radar_c
 合成回帰6/6で、モード別の時計名・warnings、旧syncとsync_historyの補正、起動時復旧・HTTP・一式書出しの整合を確認しました。目印、offset、scale、drift、不確かさ、外挿、対応区間と保存連番は変わりません。旧名の補正でも確認日時を保持し、元受信記録・frames.jsonl・session-config.jsonのバイトが変わらないことを照合しました。全unit/HTTPは50/50を通過しました。
 
 この修正は時計metadataの訂正で、時刻の再計算や再同期ではありません。実カメラ・実センサーの追加収録は行っておらず、物理同期精度の確認状況は変わりません。
+
+
+## 0.4.0 raw ADC/IQ処理の追加検証
+
+- unit/HTTP: 77/77（既存62＋raw処理/保存/初回import12＋独自packet3）。全入力は合成。
+- 既存GUI44/44、raw GUI14/14。isolated headless、カメラ権限要求0。合成ADC→FFT/STFT、Hz/m/s、pause中の保存継続、source bytes一致、保存再生、WebSocket取得/停止と排他、reload、狭幅を確認。
+- 独自C encoderはGCC 14.2.1でCortex-M4向けにコンパイルし、ARM emulationで独立PythonのCRC32/byte列に一致。センサーは使わない。
+- CSK向け独自mainは公式SDK/BSPをprivateに参照し、全238 translation unitsのコンパイル・リンク・ELF/HEX生成。128chirp候補の独立HEX監査でmain flash内41444bytes、record checksum、CM0+/CM4 vectorとReset_Handlerの整合を確認。boot/書込み未実施。
+- 実測はbackup調査だけ。main/work/SFlash各2回readが一致、reset run後に元FW同一版と検出6件/disconnect。全register一致/復元書込みは未確認。QSPI/eFuse/RAMはbackup範囲外。
+- 実機raw ADC取得0件。実測STFT、人の動作識別、長時間・物理同期は未検証。合成でのFFT/STFT成功と区別。
+
+privateの元bytes・device backup・メーカーsource/objects・スクリーンショットは公開repoへ含めない。GUI画面例は合成明示のものだけをprivate evidenceへ保存。

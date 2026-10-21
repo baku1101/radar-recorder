@@ -23,6 +23,7 @@ function updateControls() {
   document.querySelectorAll('button').forEach(button => { button.disabled = busy; });
   if (typeof captureControls === 'function') captureControls();
   window.DopplerView?.updateControls();
+  window.MicroView?.controls();
   if (!current) return;
   const running = ['running', 'stopping'].includes(current.state);
   $('import-radar').disabled = busy || !!current.source;

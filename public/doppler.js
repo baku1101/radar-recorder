@@ -6,7 +6,7 @@ const view = {
   paused: false, playing: false, playhead: 0, follow: true, pending: false, generation: 0, lastKey: '', lastTick: performance.now(), lastFetch: -Infinity,
   updateControls() {
     const recording = typeof captureRuntime !== 'undefined' && !!captureRuntime;
-    byId('monitor-start').disabled = busy || recording || this.monitorBusy;
+    byId('monitor-start').disabled = busy || recording || this.monitorBusy || window.MicroView?.hardwareBusy;
     byId('monitor-stop').disabled = !this.monitorBusy;
     byId('doppler-play').disabled = this.source !== 'session' || !this.session || !(this.session.time_range.duration_s > 0);
     byId('doppler-seek').disabled = this.source !== 'session' || !this.session || !(this.session.time_range.duration_s > 0);

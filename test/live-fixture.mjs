@@ -6,7 +6,10 @@ export async function livePeer({ intervalMs = 20, message = null } = {}) {
   const sockets = new Set(), timers = new Set();
   const server = http.createServer();
   const send = (socket, text, opcode = 1) => {
-    const payload = Buffer.from(text), header = payload.length < 126 ? Buffer.from([0x80 | opcode, payload.length]) : Buffer.from([0x80 | opcode, 126, payload.length >> 8, payload.length & 255]);
+    const payload = Buffer.from(text); let header;
+    if(payload.length<126)header=Buffer.from([0x80|opcode,payload.length]);
+    else if(payload.length<65536)header=Buffer.from([0x80|opcode,126,payload.length>>8,payload.length&255]);
+    else {header=Buffer.alloc(10);header[0]=0x80|opcode;header[1]=127;header.writeBigUInt64BE(BigInt(payload.length),2);}
     socket.write(Buffer.concat([header, payload]));
   };
   let sequence = 0;

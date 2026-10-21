@@ -1,6 +1,6 @@
-# レーダーレビュー 0.3.0
+# レーダー収録レビュー 0.4.0
 
-個人PCでレーダーの検出イベントとカメラ動画を直接収録し、同期目印と日本語の区間ラベルを本人が確認するローカルアプリです。raw ADC、FFT、FPGA、動画モデルによる自動ラベル、学習処理は未実装です。
+個人PCでレーダーの検出イベントとカメラ映像を記録し、同期の不確かさと日本語の区間ラベルを本人が確認するローカルアプリです。0.4.0では別経路で、生ADC/IQの元bytes保存、range FFT・STFTによるmicro-Doppler表示、raw保存ログの再生を追加しました。**接続中CSKの現FWから実測rawを取得する経路はまだ成立していません。** FPGA・行動モデル自動ラベル・学習実行は未実装です。
 
 ## 起動
 
@@ -12,6 +12,14 @@ cd radar-recorder
 ```
 
 ポート変更は `start.ps1 -Port 8766`、保存先変更は `-DataDirectory <絶対パス>`。通常のNode起動では `RADAR_PORT` と `RADAR_DATA_DIR` を指定できます。起動するだけではカメラやレーダーに接続しません。
+
+## 生波形からのmicro-Doppler
+
+画面上部の「生波形からのmicro-Doppler」で「合成ADCで処理を確認」を押すと、実機を使わずにADCサンプルからFFT/STFTを計算できます。Hz/m/s切替、表示一時停止、保存ログのseek/再生、元bytes・設定の読戻しとexportに対応します。raw JSONL入力とローカルraw WebSocketの連続入力も利用できます。検出点の時刻―速度グラフは別に残しています。
+
+現在のCSKを選んでも検出点をrawと称して成功にはしません。実測rawは0件で、現物向けの独自UART producer FWはソース・ELF/HEX候補まで準備した段階です。FW書込み、boot/連続raw動作、元FW復元は未実証です。合成の画面と実機の達成状態を区別します。
+
+[raw入力・計算・軸・機器経路と制限](docs/MICRO_DOPPLER.md)、[独自CSK FW候補のビルドと残件](firmware/csk-raw/README.md)を参照してください。
 
 ## USB / UARTの準備
 
