@@ -77,9 +77,14 @@ test('shutdown/interruption and a new controller resume from durable source curs
 test('frame save failure is visible and resuming uses source rather than losing the consumed row', async t => {
   let fail = false;
   const store = setup(t, { beforeWrite: name => { if (fail && name === 'frames.jsonl') throw new Error('simulated disk full'); } }), m = source(store), c = new SessionController(store, { delayMs: 1 }); t.after(() => c.close());
-  fail = true; await c.start(m.id); await eventually(() => store.get(m.id).state === 'error');
+  // This test checks durable recovery, not scheduler speed on a hosted Windows disk.
+  // Other tests cover timer-driven start/stop; drive the same production pump explicitly here.
+  c.schedule = () => {};
+  fail = true; await c.start(m.id); await assert.rejects(c.pump(m.id), /simulated disk full/); assert.equal(store.get(m.id).state, 'error');
   assert.equal(store.get(m.id).count, 0); assert.match(store.get(m.id).last_error.message, /disk full/);
-  fail = false; await c.start(m.id); await eventually(() => store.get(m.id).state === 'completed'); assert.equal(store.get(m.id).count, 122); assert.equal(store.verify(m.id).ok, true);
+  fail = false; await c.start(m.id);
+  for (let remaining = 123; remaining > 0 && store.get(m.id).state === 'running'; remaining--) await c.pump(m.id);
+  assert.equal(store.get(m.id).state, 'completed'); assert.equal(store.get(m.id).count, 122); assert.equal(store.verify(m.id).ok, true);
 });
 test('manifest failure after fsync is recovered without duplicating the committed frame', async t => {
   let armed = false, failed = false;
