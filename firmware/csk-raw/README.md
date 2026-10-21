@@ -1,6 +1,6 @@
 # CSK raw FIFO producer（未書込み候補）
 
-対象はKITCSKBGT60CUTR13TOBO1のCSK、PSoC6 CY8C624AFNI-S2D43、BGT60CUTR13AIPのB-step向けです。現物のレーダーstepは未読出しです。現行FWの機能を追加するPC設定ではなく、独自FWの候補です。現FWの検出/追跡を置き換えるため、元dev FWのbackup・復元手順と本人の明示的な書込み承認が必要です。
+対象はKITCSKBGT60CUTR13TOBO1のCSK、PSoC6 CY8C624AFNI-S2D43、BGT60CUTR13AIPのB-step向けです。現物のレーダーstepは保存済みID_HW値と同梱定義の照合でBと識別できました。この成果物は独自FWの候補で、既存PC APIの適用可否とは別です。現FWの検出/追跡を置き換えるため、元dev FWのbackup・復元手順と具体的な作業範囲の確認が必要です。現在は[既存PC APIを優先して再確認](../../docs/PC_RAW_API_PATHS.md)し、書換えは保留しています。
 
 `main.c` はidleで起動し、独自`RADC_START\n`で開始、`RADC_STOP\n`でFSMを止めます。設定前にB-stepの既知IDを照合し、不一致では停止します。FIFO/SPI/IRQエラーで停止し、元uint16 bytesをframingしてUARTへ送ります。登録設定の読戻しbytesも送ります。これは既存Infineon UART protocolではありません。
 
@@ -67,6 +67,6 @@ callback時計に合わせてframeを置き、frame内は宣言されたTcを使
 
 ## 今回のprivate artifactとbackup調査
 
-128chirp候補のHEXは生成済みです。SHA256とprofile、書込み/復帰の未承認手順、試験後の状態選択は[raw pilot手順案](../../docs/MICRO_DOPPLER_PILOT.md)にまとめました。
+128chirp候補のHEXは生成済みです。SHA256とprofile、現在保留中の書込み/復帰手順、試験後の状態選択は[raw pilot手順案](../../docs/MICRO_DOPPLER_PILOT.md)にまとめました。
 
 本人が別途許可したbackup読取りは実施済みです。実MCU CY8C624AFNI-S2D43/protection NORMALを確認し、約11秒でmain 2MiB/work 32KiB/SFlash 32KiBを各2回読み、bytes/hash一致を確認しました。reset run後に同じ元FW版と検出出力へ戻り、disconnectしました。metadataと低位register範囲は一致した一方、校正/MD/SEQ_BUFFER等の全register一致は確認できません。復元書込みと実機raw/boot試験は未実施です。上の残件にあるbackup調査部分はこの範囲まで進んでいますが、完全な復元保証を意味しません。

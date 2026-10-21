@@ -60,9 +60,10 @@ PC到着時刻は元envelopeとframe metadataに保存し、STFT時刻やHz/m/s�
 
 |経路|確認できたこと|未確認・必要な操作|
 |---|---|---|
-|現行CSK UART FW|同梱TerminalCommandにraw readなし。GET_ALGO_CONFIG/GET_USER_ALGO_CONFIGも現FWでERROR。検出点は受信実績あり|全ADC/full FFT出力なし。既存検出イベントをrawへ読み替えない|
-|Strata/DeviceSmartar|同梱FrameReaderにはADC frame APIが存在。read-only discoveryでは`No connected devices found`|現在のKitProg3 UARTとは別経路。USB driverだけで解決する証拠なし|
-|公式CSK reference|exact CYSBSYSKIT-DEV-01 target、off-chip ADC FIFO branchとJapan profileあり|UARTへADCを流す独自producerが必要。準備したC/bridgeは現FWに存在しないprotocol|
+|現行CSK UART FW|同梱TerminalCommandに専用raw getterなし。検出点・設定dumpは受信実績あり|既知経路でADC送出方法は未確認。FW全体にraw機能がないとは断定しない。既存検出イベントをrawへ読み替えない|
+|Strata/DeviceSmartar|同梱FrameReaderにADC APIが存在。探索backendはserial/udp/uvc/libusb。過去の探索は0件|現FWのStrata protocol/interface対応は未確認。constructor/openはreset・書込み・校正・start等を含む。探索0件だけで非対応やFW変更必須とはしない|
+|DeviceFmcw / C SDK|同梱にget_list・port指定接続・frame API、native raw-frame exportあり|こちらの実機接続は未実施。nativeのB-step／現CSK FW互換・初期化の副作用は未確認|
+|公式CSK reference|exact CYSBSYSKIT-DEV-01 target、off-chip ADC FIFO branchとJapan profileあり|準備したUART ADC branchは独自producerによる。現FWの既存raw出力可否とは別で、準備したC/bridgeのprotocolを現FWが出すとは扱わない|
 |同梱FW候補|CSK向けevaluation/PDT/localizationのHEXを確認|現dev buildと同一の復元imageは未確認。これらがraw UART producerだとも未確認|
 |backup/restore|公式ProgrammerにRead/Verifyあり。許可されたSWD調査でmain/work/SFlashを各2回private読出し、hash一致、元FW起動/検出出力/disconnectを確認|復元書込みは未実証。QSPI/eFuse/RAMは対象外。校正/MD/SEQ_BUFFER等の全register一致も未確認|
 
@@ -78,7 +79,7 @@ PC到着時刻は元envelopeとframe metadataに保存し、STFT時刻やHz/m/s�
 
 より長い窓の候補として、同じ公式profileを同梱HALでオフライン変更した128 chirp×1RX×64 sample、約99.9614375ms/frameも用意しました。Tc・16回平均・帯域は維持します。128点窓は64.1568ms、約15.58681Hz/bin（約0.03844m/s/bin）、frame間gapは約35.80464ms。16384 bytes/frame＋headerで約164.2kB/s、理論上限の82.1%のため、実測の余裕は未確認です。1RXなので角度処理を提供しません。平均化による周波数応答・位相安定性・実際の欠損も実機試験が必要です。Nyquistを超える動作はaliasします。
 
-PSoC part/BSPの適合と、レーダーのsilicon step/profileの適合を分けます。独自mainはB-stepの既知IDを設定前に読み、不一致・unknown時はprofileを書かず停止します。現物のstepはまだ実読出しできていません。ビルド成功は実機raw取得、boot、micro-Dopplerの動作確認を意味しません。
+PSoC part/BSPの適合と、レーダーのsilicon step/profileの適合を分けます。独自mainはB-stepの既知IDを設定前に読み、不一致・unknown時はprofileを書かず停止します。現物は保存済みID_HW値と同梱定義の照合でB-stepと識別できました。以前のstep unknownは訂正します。ビルド成功は実機raw取得、boot、micro-Dopplerの動作確認を意味しません。
 
 ## 検証範囲
 
@@ -86,4 +87,4 @@ PSoC part/BSPの適合と、レーダーのsilicon step/profileの適合を分�
 
 実測raw、実測STFT連続更新、人の動作の識別、物理同期、長時間取得は未確認です。ソフト側が合成で通過しても、この実機取得の未達成は残ります。
 
-具体的な候補HEX/hashと、書込み・5秒raw試験・復帰・試験後の状態を本人が判断するための[手順案](MICRO_DOPPLER_PILOT.md)を用意しています。書込みは未承認・未実行です。
+具体的な候補HEX/hashと、書込み・5秒raw試験・復帰・試験後の状態を本人が判断するための[手順案](MICRO_DOPPLER_PILOT.md)を用意しています。現在は[既存PC APIの適用条件](PC_RAW_API_PATHS.md)を優先して再確認し、FW書換えは保留・未実行です。
