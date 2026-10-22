@@ -28,7 +28,7 @@
 ## 復旧する場合の手順（今回は未実行）
 
 1. アプリで取得を停止し終了します。他アプリがポート使用中なら作業しません。対象kit/MCU、元backup2ファイルの長さ・hash一致を確認します。
-2. 公式OpenOCDの `interface/kitprog3.cfg` と `target/psoc6.cfg` を使い、`init; reset halt` 後、main bankだけを対象にします。
+2. 今回使用した公式OpenOCDの `interface/kitprog3.cfg` と `target/infineon/cy8cxxa.cfg` を使い、`ENABLE_ACQUIRE=0` / `ENABLE_POWER_SUPPLY=0` にします。`init` 後、CM0/CM4を有限timeoutでhaltし、`psoc6_main_cm0` をprobeしてmain bankだけを対象にします。
 3. 既知の元mainを `flash write_image erase <private-main-1.bin> 0x10000000 bin`、続けて `verify_image <private-main-1.bin> 0x10000000 bin` で照合します。アドレス範囲は `0x10000000..0x101FFFFF` のみです。
 4. `reset run; shutdown`、元FWの版/GET/検出を確認して切断します。保護解除・全chip erase・別領域書込みへ広げません。verifyが失敗したら停止して原因を確認します。
 

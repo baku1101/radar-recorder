@@ -31,4 +31,7 @@ export function video(store, id, duration = 12) {
   const m = store.attachVideo(id, staged, 'fixture.webm'); return store.videoMetadata(id, { sha256: m.video.sha256, duration_s: duration });
 }
 export const anchors = (end = 12) => [{ radar_s: 0, video_s: 0, radar_uncertainty_s: .1, video_uncertainty_s: .1, note: 'synthetic start' }, { radar_s: end, video_s: end, radar_uncertainty_s: .1, video_uncertainty_s: .1, note: 'synthetic end' }];
-export async function eventually(fn, timeout = 4000) { const start = Date.now(); while (Date.now() - start < timeout) { if (await fn()) return; await new Promise(r => setTimeout(r, 10)); } throw new Error('Timed out waiting for condition'); }
+// Hosted Windows fsync of the 122-record fixture can exceed four seconds.
+// This is a completion wait, not a production latency requirement; explicit timeout tests retain their limits.
+const completionTimeout = process.platform === 'win32' && process.env.CI ? 20000 : 4000;
+export async function eventually(fn, timeout = completionTimeout) { const start = Date.now(); while (Date.now() - start < timeout) { if (await fn()) return; await new Promise(r => setTimeout(r, 10)); } throw new Error('Timed out waiting for condition'); }
