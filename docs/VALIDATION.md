@@ -1,5 +1,12 @@
 # 検証範囲と実施履歴
 
+## 0.5.1 開始ボタンとサーバー更新（2026-10-22）
+
+実際に稼働していた旧サーバーが新HTMLを返す一方、micro.jsとraw APIは404だったため、開始handlerが未読込になる問題を確認しました。旧サーバー検出・モジュール未読込・クリック即時状態・接続段階・mock ADC更新/停止・非同期接続エラー・事前設定エラーのGUI **7/7** を別portの合成mockで検証。既存micro GUI **14/14**、ローカルunit/HTTP/mock **93/93** も通過しました。Windows launcherは既存サーバーを残したまま二重起動を拒否することを確認しています。LinuxではこのWindows専用1件をskipします。
+
+旧8765の所有と取得idleを直前に照合し、その当アプリNodeだけ新版へ切り替えました。新micro.jsの200配信とraw capabilityをGETで確認。今回COM接続・実収録・FW操作・カメラは行っていません。保存済み実ADCのGUI確認もコピーした記録と別portだけを使います。
+
+
 ## 0.5.0 実機ADCとmicro-Doppler（2026-10-22）
 
 ローカルの合成unit/HTTP/mockは **91/91**、合成micro-Doppler GUIは **14/14** 通過。新規CSK adapterは独立packet/clock保持、有限queue、readback不一致停止、校正領域差のunknown保持、停止・保存・再読込をmockで検証。uint16 little endian・DC除去・既知スペクトルの数値回帰も追加しました。FWのUART writerはARM emulationで一時0byte/partial writeと有限timeoutを検証しました。

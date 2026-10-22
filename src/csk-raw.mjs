@@ -10,7 +10,7 @@ export function rawCskSettings(){
  if(s.firmware!=='radc-0.2.0'||!/^[a-f0-9]{64}$/.test(s.profile_header_sha256)||!Array.isArray(s.requested_registers))throw new AppError('RAW_CSK_SETTINGS_INVALID','raw実機設定の識別情報が不正です');return s;
 }
 export class CskRawAdapter{
- constructor({port='COM10',settings,dir,launch=spawn,runtime=cskRuntime()}={}){if(!/^COM\d{1,3}$/i.test(port))throw new AppError('INVALID_COM_PORT','COM番号を指定してください');Object.assign(this,{port,settings,dir,launch,runtime});this.queue=[];this.bytes=0;this.discarded=0;this.stopping=false;this.firstTick=null;this.lastTick=null;this.wrap=0;this.last=performance.now();}
+ constructor({port='COM10',settings,dir,launch=spawn,runtime=cskRuntime(),onProgress=()=>{}}={}){if(!/^COM\d{1,3}$/i.test(port))throw new AppError('INVALID_COM_PORT','COM番号を指定してください');Object.assign(this,{port,settings,dir,launch,runtime,onProgress});this.queue=[];this.bytes=0;this.discarded=0;this.stopping=false;this.firstTick=null;this.lastTick=null;this.wrap=0;this.last=performance.now();}
  async open(){
   const r=this.runtime;if(!fs.existsSync(r.python)||!fs.existsSync(path.join(r.vendorLib,'serial')))throw new AppError('RAW_CSK_RUNTIME_REQUIRED','Python 3.11と公式ツール同梱のserial libraryが必要です');
   const c=validateRawConfig(this.settings.header.config);this.parser=new RawPacketParser({frameBytes:c.frame_bytes});
@@ -24,7 +24,7 @@ export class CskRawAdapter{
   this.exited=new Promise(resolve=>child.once('exit',code=>{this.exitCode=code;if(!this.stopping)this.failure??=new AppError('RAW_CSK_DISCONNECTED',`raw受信プロセスが終了しました (${code})`);resolve();}));
   await new Promise((resolve,reject)=>{let settled=false;const finish=e=>{if(settled)return;settled=true;clearTimeout(timer);e?reject(e):resolve();},timer=setTimeout(()=>finish(new AppError('RAW_CSK_CONNECT_TIMEOUT','実機rawの識別・設定読戻しがタイムアウトしました')),15000);
    child.once('error',finish);child.once('exit',()=>finish(this.failure??new Error('Raw reader exited before ready')));
-   this.lines.on('line',line=>{let m;try{m=JSON.parse(line);}catch{return;}if(m.kind==='error'){this.failure=new AppError('RAW_CSK_CONNECTION_FAILED',m.message);finish(this.failure);}if(m.kind==='ready'){
+   this.lines.on('line',line=>{let m;try{m=JSON.parse(line);}catch{return;}if(m.kind==='progress'){try{this.onProgress(m.phase);}catch(e){this.failure=e;finish(e);return;}}if(m.kind==='error'){this.failure=new AppError('RAW_CSK_CONNECTION_FAILED',m.message);finish(this.failure);}if(m.kind==='ready'){
     const info=m.firmware_info,b=Buffer.from(m.register_readback_base64??'','base64'),requested=this.settings.requested_registers;
     if(info?.chirps!==c.chirps_per_frame||info?.rx!==c.rx_count||info?.samples!==c.samples_per_chirp||info?.register_count!==requested.length||b.length!==requested.length*8||hash(b)!==m.register_readback_sha256||requested.some((r,i)=>r[0]!==b.readUInt32LE(i*8))){this.failure=new AppError('RAW_CSK_READBACK_INVALID','実機rawのshape・設定読戻し件数/順序/hashが一致しません');finish(this.failure);return;}
     // ADC calibration configuration locations read back as zero on the measured B-step device.

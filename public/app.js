@@ -7,6 +7,23 @@ const stateLabel = item => (item.mode === 'live' ? liveStateNames : stateNames)[
 let token, selected, current, configuration, frames = [], busy = false, videoKey = '', labelsKey = '', pollTimer, sessions = [], previewRequest = 0;
 const fixed = x => typeof x === 'number' ? x.toFixed(3) : '不明';
 const uid = () => crypto.randomUUID();
+// This script also exists on older servers. Detect new HTML served by an old
+// in-memory router before enabling controls whose module/API cannot be loaded.
+window.RawUiHealth = {
+  compatible: null, moduleReady: false,
+  show(text, error = false, phase = 'ready') {
+    const node = $('micro-connection'); if (!node) return;
+    node.textContent = text; node.className = 'message' + (error ? ' error' : ''); node.dataset.phase = phase;
+  },
+  controls() { if (this.compatible !== true || !this.moduleReady) for (const id of ['micro-start','micro-demo','micro-import']) { const node=$(id); if(node)node.disabled=true; } },
+  accept(result) {
+    this.compatible = !!result.capabilities?.raw_micro_doppler?.inputs?.includes('csk_raw_uart');
+    if (!this.compatible) this.show('起動中のサーバーが古いため、生ADC画面を読み込めません。収録を終了して起動用ウィンドウをCtrl+Cで閉じ、start.cmdを起動し直して、このページを再読み込みしてください。', true, 'server_outdated');
+    else if (this.moduleReady) this.show('準備完了。「接続して実raw表示・保存を開始」を押すと接続します。', false, 'ready');
+    this.controls(); window.MicroView?.controls();
+  }
+};
+setTimeout(() => { const health=window.RawUiHealth;if(health.compatible===true&&!health.moduleReady)health.show('生ADC画面のプログラムを読み込めません。このページを再読み込みしてください。改善しない場合はstart.cmdからサーバーを起動し直してください。',true,'module_unavailable');health.controls(); }, 5000);
 function message(text, error = false) { $('message').hidden = false; $('message').textContent = text; $('message').className = 'message' + (error ? ' error' : ''); }
 async function api(url, body, { raw = false, method = body === undefined ? 'GET' : 'POST' } = {}) {
   const headers = {}; if (method === 'POST') { headers['x-radar-token'] = token; if (!raw) headers['Content-Type'] = 'application/json'; }
@@ -24,6 +41,7 @@ function updateControls() {
   if (typeof captureControls === 'function') captureControls();
   window.DopplerView?.updateControls();
   window.MicroView?.controls();
+  window.RawUiHealth.controls();
   if (!current) return;
   const running = ['running', 'stopping'].includes(current.state);
   $('import-radar').disabled = busy || !!current.source;
@@ -209,6 +227,6 @@ $('video').addEventListener('error', () => { if (current?.video) { $('video-erro
 $('video').addEventListener('timeupdate', updateVideoTime);
 $('chart').onclick = event => { if (!current?.sync) return; const box = $('chart').getBoundingClientRect(), x = (event.clientX - box.left) / box.width * $('chart').width; const radar = Math.max(0, Math.min(current.time_range.duration_s, (x - 48) / ($('chart').width - 68) * current.time_range.duration_s)); const video = (radar - current.sync.offset_s) / current.sync.scale; if (video >= 0 && video <= $('video').duration) $('video').currentTime = video; };
 (async () => {
-  try { const result = await api('/api/bootstrap'); token = result.token; sessions = result.sessions; renderList(); if (result.recovery_problems.length) message('前回の記録に読み戻し不一致があります。元ファイルを保持して確認してください。', true); const saved = sessionStorage.getItem('radar-session'); if (sessions.some(x => x.id === saved)) await selectSession(saved); }
-  catch (error) { message(error.message, true); }
+  try { const result = await api('/api/bootstrap'); token = result.token; window.RawUiHealth.accept(result); sessions = result.sessions; renderList(); if (result.recovery_problems.length) message('前回の記録に読み戻し不一致があります。元ファイルを保持して確認してください。', true); const saved = sessionStorage.getItem('radar-session'); if (sessions.some(x => x.id === saved)) await selectSession(saved); }
+  catch (error) { message(error.message, true); window.RawUiHealth.compatible=false;window.RawUiHealth.show('サーバーに接続できません: '+error.message,true,'server_unavailable');window.RawUiHealth.controls(); }
 })();

@@ -21,7 +21,7 @@ async function imported(call) {
 test('HTTP serves Japanese GUI locally with a CSP and no external resource dependencies', async t => {
   const { app } = await appFor(t), response = await fetch(app.origin), html = await response.text();
   assert.equal(response.status, 200); assert.ok(html.includes('レーダーレビュー')); assert.ok(response.headers.get('Content-Security-Policy').includes("connect-src 'self'")); assert.equal(/https?:\/\//.test(html), false);
-  const bootstrap = await (await fetch(app.origin + '/api/bootstrap')).json(); assert.equal(bootstrap.capabilities.live_capture, true); assert.equal(bootstrap.capabilities.auto_label.implemented, false);
+  const bootstrap = await (await fetch(app.origin + '/api/bootstrap')).json(); assert.equal(bootstrap.app.id,'radar-recorder-local');assert.equal(bootstrap.app.version,JSON.parse(fs.readFileSync(new URL('../package.json',import.meta.url),'utf8')).version);assert.ok(Number.isFinite(Date.parse(bootstrap.app.started_at)));assert.equal(bootstrap.capabilities.live_capture, true); assert.equal(bootstrap.capabilities.auto_label.implemented, false);
 });
 test('external Origin / unexpected Host / unauthenticated mutations are rejected', async t => {
   const { app } = await appFor(t);

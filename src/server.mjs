@@ -17,6 +17,7 @@ import { PLOT_LIMITS } from '../public/plot-model.mjs';
 import { RawService, RAW_HARDWARE_STATUS } from './raw-service.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url)), project = path.dirname(here);
+const APP_VERSION = JSON.parse(fs.readFileSync(path.join(project,'package.json'),'utf8')).version;
 const MAX_UPLOAD = 256 * 1024 * 1024;
 function assertKeys(body, keys) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new AppError('INVALID_REQUEST', '入力はJSON objectで指定してください');
@@ -53,13 +54,13 @@ function serveVideo(req, res, file, mime) {
   fs.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
 }
 
-export async function createApp({ root = path.join(project, 'data', 'sessions'), port = 8765, delayMs = 10, storeOptions = {}, liveFactory, leaseMs } = {}) {
+export async function createApp({ root = path.join(project, 'data', 'sessions'), port = 8765, delayMs = 10, storeOptions = {}, liveFactory, leaseMs, rawCskFactory } = {}) {
   let monitor, raw;
   const store = new SessionStore(root, storeOptions), controller = new SessionController(store, { delayMs, liveFactory, leaseMs, canAcquireLive: () => !monitor?.busy && !raw?.busy });
   const recordingIdle=()=>!controller.liveReservation && ![...controller.runtime.values()].some(runtime=>runtime.live);
   monitor = new DetectionMonitor({ factory: liveFactory, leaseMs, canAcquire: () => recordingIdle() && !raw?.busy });
-  raw = new RawService(root,{canAcquire:()=>recordingIdle()&&!monitor.busy,leaseMs});
-  const recoveryProblems = controller.initialize(), token = randomUUID(), model = new VideoLabelAdapter();
+  raw = new RawService(root,{...(rawCskFactory?{cskFactory:rawCskFactory}:{}),canAcquire:()=>recordingIdle()&&!monitor.busy,leaseMs});
+  const recoveryProblems = controller.initialize(), token = randomUUID(), model = new VideoLabelAdapter(), startedAt=new Date().toISOString();
   let origin;
   const json = (res, body, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
   const server = http.createServer(async (req, res) => {
@@ -88,7 +89,7 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
       }
       if (req.method === 'POST' && url.pathname === '/api/monitor/stop') { assertKeys(await jsonBody(req), []); return json(res, await monitor.stop()); }
       if (req.method === 'GET' && url.pathname === '/api/monitor') return json(res, monitor.view({ windowS: Number(url.searchParams.get('window_s') ?? 30), paused: url.searchParams.get('paused') === '1' }));
-      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], detection_monitor: { implemented: true, recording: false, camera: false, axes: ['speed_mps', 'doppler_bin'], full_spectrum: false, limits: PLOT_LIMITS }, raw_micro_doppler: { implemented: true, inputs: ['raw_jsonl', 'synthetic_raw', 'local_websocket_raw_adc', 'csk_raw_uart'], hardware: RAW_HARDWARE_STATUS, cross_frame_stitching: false }, camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
+      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { app:{id:'radar-recorder-local',version:APP_VERSION,started_at:startedAt},token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], detection_monitor: { implemented: true, recording: false, camera: false, axes: ['speed_mps', 'doppler_bin'], full_spectrum: false, limits: PLOT_LIMITS }, raw_micro_doppler: { implemented: true, inputs: ['raw_jsonl', 'synthetic_raw', 'local_websocket_raw_adc', 'csk_raw_uart'], hardware: RAW_HARDWARE_STATUS, cross_frame_stitching: false }, camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'GET' && url.pathname === '/api/sessions') return json(res, { ...store.list(), runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'POST' && url.pathname === '/api/sessions') {
         const body = await jsonBody(req);
@@ -222,7 +223,7 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.RADAR_PORT ?? 8765);
   const app = await createApp({ port, root: process.env.RADAR_DATA_DIR || undefined });
-  console.log(`レーダーレビュー 0.2.0\n${app.origin}\n保存先: ${app.store.root}\n直接収録は画面の操作から開始します。終了: Ctrl+C`);
+  console.log(`レーダーレビュー ${APP_VERSION}\n${app.origin}\n保存先: ${app.store.root}\n直接収録は画面の操作から開始します。終了: Ctrl+C`);
   let closing = false;
   const close = async () => { if (closing) return; closing = true; await app.close(); process.exit(0); };
   process.on('SIGINT', close); process.on('SIGTERM', close);

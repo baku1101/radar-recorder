@@ -1,6 +1,6 @@
 {
   "name": "radar-recorder-local",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "description": "Local radar detection and camera recorder with Japanese review UI",
@@ -9,10 +9,11 @@
   },
   "scripts": {
     "start": "node src/server.mjs",
-    "test": "node --test --test-isolation=none test/core.test.mjs test/server.test.mjs test/live.test.mjs test/sync-clock.test.mjs test/doppler.test.mjs test/raw.test.mjs test/raw-packet.test.mjs test/csk-raw.test.mjs",
+    "test": "node --test --test-isolation=none test/core.test.mjs test/server.test.mjs test/live.test.mjs test/sync-clock.test.mjs test/doppler.test.mjs test/raw.test.mjs test/raw-packet.test.mjs test/csk-raw.test.mjs test/launcher.test.mjs",
     "test:ui": "node test/ui.mjs",
     "test:capture-ui": "node test/capture-ui.mjs",
     "test:doppler-ui": "node test/doppler-ui.mjs",
-    "test:micro-ui": "node test/micro-ui.mjs"
+    "test:micro-ui": "node test/micro-ui.mjs",
+    "test:raw-start-ui": "node test/raw-start-ui.mjs"
   }
 }

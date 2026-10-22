@@ -25,12 +25,12 @@ def main():
     if len(pending)>1048576:raise RuntimeError('Unexpected initialization response size')
    i=pending.index(marker);before=bytes(pending[:i]);del pending[:i+len(marker)];return before
   try:
-   port.open();command(b'RADC_INFO\n');until(b'RADC_INFO ');raw_info=until(b'\n');info=json.loads(raw_info)
+   emit({'kind':'progress','phase':'connecting'});port.open();emit({'kind':'progress','phase':'firmware_identity'});command(b'RADC_INFO\n');until(b'RADC_INFO ');raw_info=until(b'\n');info=json.loads(raw_info)
    if info.get('firmware')!='radc-0.2.0' or info.get('protocol')!='RADC0001' or info.get('profile_header_sha256')!=a.profile_sha256 or info.get('sensor_id_hw')!=0x98185 or info.get('sensor_id_status')!=0 or info.get('running'):
     raise RuntimeError('Raw firmware/profile/idle/silicon identity mismatch; START was not sent; '+json.dumps(info))
    count=info.get('register_count')
    if not isinstance(count,int) or count<1 or count>4096:raise RuntimeError('Invalid readback register count')
-   command(b'RADC_START\n');started=True;until(b'RADC_PROFILE_READBACK_BEGIN\n')
+   emit({'kind':'progress','phase':'configuration_readback'});command(b'RADC_START\n');started=True;until(b'RADC_PROFILE_READBACK_BEGIN\n')
    end=time.monotonic()+6
    while len(pending)<count*8:
     if stop.is_set() or time.monotonic()>end:raise RuntimeError('Incomplete sensor configuration readback')
