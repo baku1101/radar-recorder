@@ -10,6 +10,13 @@ if ($portInUse) {
     throw "Port $Port is already in use. Running server: $runningVersion; files: $expectedVersion. No second server was started. If this is radar-recorder, finish recording, stop its original window with Ctrl+C, then run start.cmd again. If the current server is already correct, reload http://127.0.0.1:$Port in your browser."
 }
 $nodeCandidates = @()
+if (Test-Path -LiteralPath (Join-Path $PSScriptRoot '.runtime\windows\current.json')) {
+    . (Join-Path $PSScriptRoot 'scripts\windows-common.ps1')
+    $portable = Get-PortableRuntime $PSScriptRoot
+    $lockHash = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'windows-runtime.lock.json') -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($portable.Marker.lock_sha256 -ne $lockHash) { throw 'Runtime lock changed. Run setup.cmd before starting this version.' }
+    $nodeCandidates += $portable.Node
+}
 foreach ($nodeRoot in @((Join-Path $env:LOCALAPPDATA 'Volta\tools\image\node'), (Join-Path $env:USERPROFILE 'AppData\Local\Volta\tools\image\node'))) {
     if (Test-Path -LiteralPath $nodeRoot) {
         $nodeCandidates += Get-ChildItem -LiteralPath $nodeRoot -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+$' } | Sort-Object { [version]$_.Name } -Descending | ForEach-Object { Join-Path $_.FullName 'node.exe' }
@@ -18,7 +25,7 @@ foreach ($nodeRoot in @((Join-Path $env:LOCALAPPDATA 'Volta\tools\image\node'), 
 $nodeFromPath = Get-Command node -ErrorAction SilentlyContinue
 if ($nodeFromPath) { $nodeCandidates += $nodeFromPath.Source }
 $nodeExe = $nodeCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-if (-not $nodeExe) { throw 'Node.js 22+ is required. See README.md.' }
+if (-not $nodeExe) { throw 'Run setup.cmd first to prepare application-local Node and Python. See docs/WINDOWS_SETUP.md.' }
 $previousPort = $env:RADAR_PORT
 $previousData = $env:RADAR_DATA_DIR
 try {

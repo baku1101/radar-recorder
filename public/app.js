@@ -17,6 +17,7 @@ window.RawUiHealth = {
   },
   controls() { if (this.compatible !== true || !this.moduleReady) for (const id of ['micro-start','micro-demo','micro-import']) { const node=$(id); if(node)node.disabled=true; } },
   accept(result) {
+    this.canListPorts=result.capabilities?.raw_port_enumeration===true;window.MicroView?.installPortPicker?.();
     this.compatible = !!result.capabilities?.raw_micro_doppler?.inputs?.includes('csk_raw_uart');
     if (!this.compatible) this.show('起動中のサーバーが古いため、生ADC画面を読み込めません。収録を終了して起動用ウィンドウをCtrl+Cで閉じ、start.cmdを起動し直して、このページを再読み込みしてください。', true, 'server_outdated');
     else if (this.moduleReady) this.show('準備完了。「接続して実raw表示・保存を開始」を押すと接続します。', false, 'ready');

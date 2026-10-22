@@ -3,6 +3,7 @@ evidence/
 test-output/
 .runtime/
 node_modules/
+packages/
 *.log
 *.tmp
 .env

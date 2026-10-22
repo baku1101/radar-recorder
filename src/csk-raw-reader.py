@@ -2,8 +2,8 @@
 import argparse, json, os, sys, time, threading, hashlib, base64
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--port',required=True);p.add_argument('--vendor-lib',required=True);p.add_argument('--wire',required=True);p.add_argument('--profile-sha256',required=True);a=p.parse_args()
- sys.path.insert(0,a.vendor_lib)
+ p=argparse.ArgumentParser();p.add_argument('--port',required=True);p.add_argument('--vendor-lib');p.add_argument('--wire',required=True);p.add_argument('--profile-sha256',required=True);a=p.parse_args()
+ if a.vendor_lib:sys.path.insert(0,a.vendor_lib)
  import serial
  stop=threading.Event();threading.Thread(target=lambda:(sys.stdin.buffer.read(1),stop.set()),daemon=True).start()
  def emit(v):print(json.dumps(v),file=sys.stderr,flush=True)

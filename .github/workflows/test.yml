@@ -14,3 +14,7 @@ jobs:
         with:
           node-version: '24'
       - run: npm test
+      - name: Clean portable Windows setup (no sensor)
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: ./test/windows-setup.ps1

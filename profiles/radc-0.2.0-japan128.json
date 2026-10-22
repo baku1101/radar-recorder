@@ -1,0 +1,44 @@
+{
+  "firmware": "radc-0.2.0",
+  "profile_header_sha256": "a58c4015094770dc5eaa439e932353f1771bf699718f5e146e4cacc041b9b9de",
+  "header": {
+    "kind": "raw_adc_header",
+    "schema_version": 1,
+    "config": {
+      "data_kind": "real_adc",
+      "sample_format": "uint16_le",
+      "layout": "chirp_rx_sample",
+      "samples_per_chirp": 64,
+      "chirps_per_frame": 128,
+      "rx_count": 1,
+      "rx_order": [
+        "rx1"
+      ],
+      "sample_rate_hz": 5000000.0,
+      "chirp_interval_s": 0.000501225,
+      "carrier_hz": 60772770385.74219,
+      "chirp_slope_hz_per_s": 33691406250000.0,
+      "sample_scale": 1,
+      "sample_offset": 0,
+      "adc_full_scale": 65535,
+      "provenance": "real",
+      "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+      "timing_source": {
+        "reference": "Profile timing decoded offline; non-calibration profile fingerprint checked at START. Physical capture origin unknown.",
+        "profile_sha256": "4a002f31d19a3d032e5559495a533230844564e7195106d063fbe04ba08352f6"
+      },
+      "averaging_factor": 16,
+      "device": "KITCSKBGT60CUTR13TOBO1; identity checked at start",
+      "physical_frame_origin_uncertainty_s": "unknown",
+      "storage_bits": 16,
+      "adc_full_scale_reference": "uint16 storage span; analog full-scale calibration unknown"
+    }
+  },
+  "readback_fingerprint": {
+    "register_count": 433,
+    "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+    "non_calibration_sha256": "3ffa85d067fdfd65c154cdcdeca4a9af0337f764e6fa7fd7657efb868429cccb",
+    "non_calibration_count": 413
+  },
+  "descriptor_scope": "Independent deployment metadata and hashes; not a vendor profile, not an individual device calibration, not firmware. No register writes from PC."
+}

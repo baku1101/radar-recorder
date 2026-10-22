@@ -1,6 +1,10 @@
-# レーダー収録・レビュー 0.5.1
+# レーダー収録・レビュー 0.6.0
 
 個人PCでレーダーと動画を保存・確認するローカルアプリです。0.5.0ではKITCSKBGT60CUTR13TOBO1の実ADC FIFOを独自raw FWからUSB-UARTで読み、range FFT/STFTによるmicro-Dopplerをリアルタイム表示・保存・再生できます。従来の検出点表示・動画同期・日本語ラベル確認も保持しています。学習・FPGA接続は未実装です。
+
+## Windows 10/11の別PCへ持っていく
+
+Windows x64配布ZIPを展開し、`setup.cmd` → `start.cmd`（診断は任意の `doctor.cmd`） の順で実行します。専用Node/Python/pyserialをフォルダ内へ配置するため、管理者権限や既存runtime、メーカーVisualization Toolは不要です。offline ZIPも用意できます。**すでにraw FW `radc-0.2.0`を導入した同じキット**が対象で、セットアップからFWは書き込みません。[手順・保存先・更新・トラブル対処](docs/WINDOWS_SETUP.md)を参照してください。
 
 ## 起動と実機micro-Doppler
 
@@ -19,7 +23,7 @@ GitHubにはメーカーコード・FW binary・private profile・実収録を�
 
 ## 更新後に開始ボタンが反応しない場合
 
-起動したままソースを更新すると、古いNodeサーバーが新しいHTMLだけを返し、新しい画面プログラムやAPIを提供できない場合があります。0.5.1はその組合せを検出し、開始ボタンの直下に再起動案内を表示します。既存収録を終了してから元の起動ウィンドウをCtrl+Cで閉じ、start.cmdを起動し直し、ブラウザをCtrl+F5で再読み込みしてください。使用中ポートに二つ目のサーバーは起動しません。
+起動したままソースを更新すると、古いNodeサーバーが新しいHTMLだけを返し、新しい画面プログラムやAPIを提供できない場合があります。0.6.0はその組合せを検出し、開始ボタンの直下に再起動案内を表示します。既存収録を終了してから元の起動ウィンドウをCtrl+Cで閉じ、start.cmdを起動し直し、ブラウザをCtrl+F5で再読み込みしてください。使用中ポートに二つ目のサーバーは起動しません。
 
 クリック直後は「開始要求を送信中」、続いて接続・FW確認・設定読戻し・最初のADC待ち・受信中がボタン直下に出ます。設定やCOM接続のエラーも同じ場所に表示します。受信中はframe数とグラフが更新されます。
 
@@ -56,7 +60,7 @@ Python 3.11がない場合は `setup-csk.ps1` で [python.orgのWindows埋込み
 
 CSK経路は現行FWが既に出力している検出イベントを受信します。開始時に `GET_FIRMWARE_INFO` と `GET_SENSOR_CONFIG` を照会し、実機応答を保存します。設定書込み・取得モード変更・FW書込みは行いません。イベントを出していないFWはタイムアウトで止まります。
 
-今回確認した条件はBGT60CUTR13、KitProg3 UART、2,000,000 baud、FW `indoor_people_localization 0.4.5.dev0+g2b14fe4.d20260212`、sensor driver `0.5.12` です。他機種・基板・FW・配布API版は未確認です。基板の正式型番は取得できず `unknown` として残します。
+今回確認した条件はBGT60CUTR13、KitProg3 UART、2,000,000 baud、FW `indoor_people_localization 0.4.5.dev0+g2b14fe4.d20260212`、sensor driver `0.6.02` です。他機種・基板・FW・配布API版は未確認です。基板の正式型番は取得できず `unknown` として残します。
 
 ## 操作
 
