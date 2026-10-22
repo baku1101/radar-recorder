@@ -14,6 +14,7 @@ bsp=rt/'csk-bsp';generated=rt/'csk-bsp-v2/COMPONENT_BSP_DESIGN_MODUS/GeneratedSo
 profile=args.profile.resolve() if args.profile else rt/'csk-raw-reference/src/radar_config/presence_detection_tracking_japan.h'
 if rt.resolve() not in profile.resolve().parents:raise SystemExit('Use a private profile inside .runtime')
 shutil.copyfile(profile,out/'radc_private_profile.h')
+(out/'radc_build_info.h').write_text('#define RADC_PROFILE_SHA256 "'+hashlib.sha256(profile.read_bytes()).hexdigest()+'"\n',encoding='ascii')
 incs=[out,root/'firmware/csk-raw',bsp,generated,bsp/'COMPONENT_CM4',pdl/'drivers/include',pdl/'devices/COMPONENT_CAT1A/include',pdl/'devices/COMPONENT_CAT1A/source',hal/'include',hal/'include_pvt',hal/'COMPONENT_CAT1A/include',hal/'COMPONENT_CAT1A/include_pvt',core/'include',cmsis/'Core/Include',driver,driver/'platform/mtb',driver/'register_hal']
 defs=['CY8C624AFNI_S2D43','COMPONENT_CAT1','COMPONENT_CAT1A','COMPONENT_CM4','COMPONENT_PSOC6HAL','COMPONENT_BSP_DESIGN_MODUS','COMPONENT_CM0P_SLEEP','CY_USING_HAL']
 flags=['-mcpu=cortex-m4','-mthumb','-mfpu=fpv4-sp-d16','-mfloat-abi=hard','-Os','-g3','-ffunction-sections','-fdata-sections','-fno-common','-Wall','-Wextra','-Wno-unused-parameter']+['-D'+d for d in defs]+['-I'+str(p) for p in incs]

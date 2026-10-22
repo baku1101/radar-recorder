@@ -1,4 +1,4 @@
-# CSK raw FIFO producer（未書込み候補）
+# CSK raw FIFO producer（独自実装）
 
 対象はKITCSKBGT60CUTR13TOBO1のCSK、PSoC6 CY8C624AFNI-S2D43、BGT60CUTR13AIPのB-step向けです。現物のレーダーstepは保存済みID_HW値と同梱定義の照合でBと識別できました。この成果物は独自FWの候補で、既存PC APIの適用可否とは別です。現FWの検出/追跡を置き換えるため、元dev FWのbackup・復元手順と具体的な作業範囲の確認が必要です。現在は[既存PC APIを優先して再確認](../../docs/PC_RAW_API_PATHS.md)し、書換えは保留しています。
 
@@ -41,32 +41,14 @@ HEXは各record checksumを確認し、data addressを`0x10000000..0x101fffff`�
 
 payloadは元のuint16 FIFO bytes。現在のlayout契約はchirp→RX→sample。CRC不一致・異常byte数・途中frameを拒否し、noiseのskip数とpacket欠番を記録します。元UART streamの別保存には、前後のstatus・register読戻しbytesも含めます。
 
-## PC bridge
+## PC readerとGUI
 
-現行stock FWへは使えません。書込み・boot・profile/step適合・原設定読戻しが確認された候補FWだけが対象です。これは現在まだ未実施の段階です。
+通常はアプリの `src/csk-raw-reader.py` → `src/csk-raw.mjs` を使います。INFOのFW版/profile hash/B-step/idleを照合してからSTARTし、433レジスタの要求・実読戻しを保存します。ADC校正領域の既知20読戻し差は意味unknownで保持し、その他の値差は停止します。STOP後にdrain/fsync/closeします。DTR/RTSはfalse、他プロセスのポートを奪いません。
 
-```powershell
-node scripts/raw-uart-bridge.mjs --candidate-firmware-confirmed `
-  --python <pyserialのあるpython.exe> --port COM10 `
-  --header <実設定とtimingを記したprivate-header.json> `
-  --raw-wire-file <新規private-wire.bin> --start-stop
-```
+`scripts/make-csk-raw-profile.py` はprivateのprofile/headerと `raw-deployment.json` を生成します。メーカーlibraryの解析はオフラインで、機器を開きません。GUIの実機/合成表示、FFT設定、時計、再生は[実rawガイド](../../docs/DIRECT_RAW.md)を参照してください。旧 `scripts/raw-uart-bridge.mjs` は汎用の手動配信用で、通常GUIに別起動は不要です。
 
-表示されたloopback URLとheaderをraw画面へ入力します。WebSocket client接続時にCOMを開きます。使用中なら失敗し、既存アプリを閉じません。DTR/RTSはfalseに設定し、break/resetは送りません。`--start-stop`はこの独自main向けの既知コマンドだけを送ります。停止はchildへ終了を通知し、STOP送信・wire fsync・closeを待つ設計です。2秒で終われないときの終了fallbackまで、実機では未確認です。
+## 実機確認の範囲
 
-callback時計に合わせてframeを置き、frame内は宣言されたTcを使います。frame原点の物理遅延はunknownです。ADC full-scale・coding・FIFO順序・readback metadataは実機で確認してheaderへ記載する必要があり、sourceの宣言だけでhardware verifiedにしません。
+`radc-0.2.0` を同じPSoC6 mainへ導入し、実ADC受信・保存・FFT/STFT・GUI開始/停止/再開・COM解放を確認しました。SPI/FIFO raw取得で、検出点の再利用ではありません。boot前の一般clock startupには公式driver initを使い、radar ID確認後にJapan由来profileを適用します。UART HALの一時0byte戻りは有限deadlineで再待機し、無期限waitにしません。
 
-## 書込み前の残件
-
-1. 公式debugのattach/halt/resetが現稼働を一時中断する可能性を確認し、許可された範囲でbackup可否と保護状態を読む。backupはprivateに保存する。
-2. 現dev FWのmain/work/user settings等、復元に必要な範囲を特定し、複数readのhash一致と元FW情報を照合する。保護領域の解除やeraseは行わない。現時点で完全backup・復元可能とは言えない。
-3. silicon step・profile・baud余裕・metadata・boot/stopの確認計画を提示し、本人の具体的な書込み承認を得る。
-4. 書込み後に原bytes、readback設定、timing/shape/欠損、連続STFTを実測検証し、終了時の復帰を検証する。
-
-許可なしのFW書込み、erase、保護変更を行うスクリプトは含みません。
-
-## 今回のprivate artifactとbackup調査
-
-128chirp候補のHEXは生成済みです。SHA256とprofile、現在保留中の書込み/復帰手順、試験後の状態選択は[raw pilot手順案](../../docs/MICRO_DOPPLER_PILOT.md)にまとめました。
-
-本人が別途許可したbackup読取りは実施済みです。実MCU CY8C624AFNI-S2D43/protection NORMALを確認し、約11秒でmain 2MiB/work 32KiB/SFlash 32KiBを各2回読み、bytes/hash一致を確認しました。reset run後に同じ元FW版と検出出力へ戻り、disconnectしました。metadataと低位register範囲は一致した一方、校正/MD/SEQ_BUFFER等の全register一致は確認できません。復元書込みと実機raw/boot試験は未実施です。上の残件にあるbackup調査部分はこの範囲まで進んでいますが、完全な復元保証を意味しません。
+実測とbuild出力を分けます。build-reportの `candidate_only` / 未書込み値は生成時点の属性で、後の導入記録とは別です。アナログ校正精度・frame間位相連続性・長時間は未実証です。元main/work/supervisory flashはprivateに二重read/hash一致で保全していますが、元FW復旧書込みは未試験です。メーカーbinary/profile/backup/実ADCは公開しません。

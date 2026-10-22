@@ -1,19 +1,8 @@
 # 生波形からのmicro-Doppler
 
-0.4.0は、元のADC/IQサンプルを保存し、range FFTとslow-time STFTからスペクトルを計算します。既存の検出点グラフとは入力も計算も別です。
+0.5.0はADC/IQの元bytesを保存し、range FFT→slow-time STFTでスペクトログラムを計算します。接続済みCSKには独自 `radc-0.2.0` を導入し、実FIFO ADCで表示・停止・再開・保存再生を確認しました。標準検出FWのイベントをrawと読み替える処理はありません。
 
-**接続中CSKの現FWで実測rawはまだ取得できていません。** `indoor_people_localization 0.4.5.dev0+g2b14fe4.d20260212` のUART出力はFW処理後の検出点です。検出点から全スペクトルを復元する処理はありません。画面の「合成ADCで処理を確認」は実機を使用しません。
-
-## 使い方
-
-`start.cmd` または `npm start` で起動し、`http://127.0.0.1:8765` を開きます。
-
-1. 「生波形からのmicro-Doppler」で「合成ADCで処理を確認」を押すと、既知の搬送波・sample timingで生成したADC波形を保存してFFT/STFTを実行します。合成の表示を常に残します。
-2. 縦軸をHzまたはm/sに切り替えられます。横軸は入力で宣言された時計上のSTFT窓中心です。接近/離反の符号は実機で校正していません。
-3. 表示の一時停止は受信・元bytes保存を継続します。取得停止は受信終了と保存処理を待ちます。保存ログの再生・seek・読戻し検証・tar.gz書出しに対応します。
-4. 実raw JSONLを読み込むか、必要なmetadataを持つローカルraw WebSocket producerに接続できます。現在のCSK FWを選んでもraw成功にはせず、未対応のエラーを表示します。
-
-カメラは不要です。検出点収録と外部raw取得は同時にセンサーを開けません。表示poll・描画・FFT workerは取得から分離しています。ただしdiskやCPUが追いつかない場合まで無損失を保証しません。
+操作、実機profile、sample coding、設定読戻し差、時計の限界は[実rawガイド](DIRECT_RAW.md)を参照してください。合成ADCの画面は実機未使用と表示します。入力のreal自己申告と、専用FW/ID/読戻し/CRCを照合した実機CSK ADCを区別します。
 
 ## 計算と軸
 
@@ -52,39 +41,12 @@ PC到着時刻は元envelopeとframe metadataに保存し、STFT時刻やHz/m/s�
 
 最大1MiB/frame、256MiB/記録、4096 frame。WebSocketはloopbackだけで、queue上限8件、16MiB、受信停止・overflowを明示します。アプリが保存しなかった受信数とsourceの欠番を分け、機器欠損はunknownを維持します。
 
-保存先は `data/raw-adc/<ID>/`。アップロード原本、source-config、要求/適用した解析設定、元envelope、各frameのbinとshape/timing/PC時計、SHA256、導出spectrumを保存します。元bytesをfsyncしてからworkerで計算し、未処理frameや中断を成功扱いにしません。raw記録は既存検出点・行動ラベル用datasetへ自動で混入させません。
+保存先は `data/sessions/raw-adc/<ID>/`。アップロード原本、source-config、要求/適用した解析設定、元envelope、各frameのbinとshape/timing/PC時計、SHA256、導出spectrumを保存します。元bytesをfsyncしてからworkerで計算し、未処理frameや中断を成功扱いにしません。raw記録は既存検出点・行動ラベル用datasetへ自動で混入させません。
 
-## 現物と取得経路の確認結果
+## 取得経路と検証
 
-現物OPNは **KITCSKBGT60CUTR13TOBO1**。製品ページはBGT60CUTR13AIPとCSK/PSoC6の組合せを示します。従来のBGT60TR13Cとは別です。[公式kit](https://www.infineon.com/evaluation-board/KIT-CSK-BGT60CUTR13)
+運用経路は、公式CUTRxx driverのSPI/FIFOを使う独自MCU producer→KitProg3 UART→独自PC readerです。メーカーの公式PC SDKが不可能と証明したという意味ではありません。[既存PC APIの静的調査](PC_RAW_API_PATHS.md)は当時の標準FWについての記録です。メーカーVisualization Tool 1.5も通常の公開配布を確認しましたが、今回の実測経路とは別です。
 
-|経路|確認できたこと|未確認・必要な操作|
-|---|---|---|
-|現行CSK UART FW|同梱TerminalCommandに専用raw getterなし。検出点・設定dumpは受信実績あり|既知経路でADC送出方法は未確認。FW全体にraw機能がないとは断定しない。既存検出イベントをrawへ読み替えない|
-|Strata/DeviceSmartar|同梱FrameReaderにADC APIが存在。探索backendはserial/udp/uvc/libusb。過去の探索は0件|現FWのStrata protocol/interface対応は未確認。constructor/openはreset・書込み・校正・start等を含む。探索0件だけで非対応やFW変更必須とはしない|
-|DeviceFmcw / C SDK|同梱にget_list・port指定接続・frame API、native raw-frame exportあり|こちらの実機接続は未実施。nativeのB-step／現CSK FW互換・初期化の副作用は未確認|
-|公式CSK reference|exact CYSBSYSKIT-DEV-01 target、off-chip ADC FIFO branchとJapan profileあり|準備したUART ADC branchは独自producerによる。現FWの既存raw出力可否とは別で、準備したC/bridgeのprotocolを現FWが出すとは扱わない|
-|同梱FW候補|CSK向けevaluation/PDT/localizationのHEXを確認|現dev buildと同一の復元imageは未確認。これらがraw UART producerだとも未確認|
-|backup/restore|公式ProgrammerにRead/Verifyあり。許可されたSWD調査でmain/work/SFlashを各2回private読出し、hash一致、元FW起動/検出出力/disconnectを確認|復元書込みは未実証。QSPI/eFuse/RAMは対象外。校正/MD/SEQ_BUFFER等の全register一致も未確認|
+[公式CUTRxx driver](https://github.com/Infineon/sensor-xensiv-bgt60cutrxx)、[公式CSK reference](https://github.com/Infineon/mtb-example-psoc6-cmos-radar-people-tracking)、[ADC datasheet](https://www.infineon.com/assets/row/public/documents/30/49/infineon-bgt60cutr13aip-datasheet-en.pdf)を元に、privateの依存を利用します。メーカーsource/profileはこのrepoへ転載しません。[独自FWビルド](../firmware/csk-raw/README.md)と[導入・復旧記録](MICRO_DOPPLER_PILOT.md)を参照してください。
 
-同梱API根拠は Visualization Tool 1.1.0 の `lib/ifxapp/hardware_access/event_readers/protocols/protocol_interface.pyc`（TerminalCommand）、`frame_readers/frame_reader_smartar.pyc`、`event_readers/smartar_motion_detector_bstep/device_smartar.pyc`。これらのメーカーコードは配布しません。JSONL検出ログに付く「raw」という呼称とADCを区別します。
-
-[公式CUTRxx driver](https://github.com/Infineon/sensor-xensiv-bgt60cutrxx)、[公式CSK reference](https://github.com/Infineon/mtb-example-psoc6-cmos-radar-people-tracking)、[ADC仕様](https://www.infineon.com/assets/row/public/documents/30/49/infineon-bgt60cutr13aip-datasheet-en.pdf)、[ProgrammerのRead/Verify](https://www.infineon.com/assets/row/public/documents/30/44/infineon-modustoolbox-programmer-gui-user-guide-usermanual-en.pdf)
-
-## 独自FWの準備状態
-
-`firmware/csk-raw/` と `scripts/build-csk-raw.py` は独立実装です。メーカーsource/profile/BSP/compilerは`.runtime/`へ別途用意します。[FW手順と制限](../firmware/csk-raw/README.md)を参照してください。書込みは実施していません。
-
-初期Japan profileは17 chirp×3RX×64 sample、16回平均後のADC FIFO。オフラインの同梱HAL解析によるTcは501.225µs、frame周期50.1622625msです。16点窓は8.0196ms、124.694498Hz/bin、約0.30756m/s/bin、速度Nyquist約2.46047m/s。frame間に約41.6414msの空白があります。6528 bytes/frame＋32 byte headerで約130.8kB/s、2Mbaud 8N1の理論上限200kB/sの65.4%です。これらはprofile解析値で、連続伝送の実測ではありません。
-
-より長い窓の候補として、同じ公式profileを同梱HALでオフライン変更した128 chirp×1RX×64 sample、約99.9614375ms/frameも用意しました。Tc・16回平均・帯域は維持します。128点窓は64.1568ms、約15.58681Hz/bin（約0.03844m/s/bin）、frame間gapは約35.80464ms。16384 bytes/frame＋headerで約164.2kB/s、理論上限の82.1%のため、実測の余裕は未確認です。1RXなので角度処理を提供しません。平均化による周波数応答・位相安定性・実際の欠損も実機試験が必要です。Nyquistを超える動作はaliasします。
-
-PSoC part/BSPの適合と、レーダーのsilicon step/profileの適合を分けます。独自mainはB-stepの既知IDを設定前に読み、不一致・unknown時はprofileを書かず停止します。現物は保存済みID_HW値と同梱定義の照合でB-stepと識別できました。以前のstep unknownは訂正します。ビルド成功は実機raw取得、boot、micro-Dopplerの動作確認を意味しません。
-
-## 検証範囲
-
-合成の実数ADCと複素IQで、独立DFTとのFFT照合、既知の正負周波数、速度換算、既知振幅、距離gate、静止除去、時間変化する位相を検証します。実数ADCは「実測」の意味ではありません。GUIも合成入力です。独自C encoderはCortex-M4向けにクロスコンパイルし、ARM emulationで独立Python CRC/byte列と照合します。
-
-実測raw、実測STFT連続更新、人の動作の識別、物理同期、長時間取得は未確認です。ソフト側が合成で通過しても、この実機取得の未達成は残ります。
-
-具体的な候補HEX/hashと、書込み・5秒raw試験・復帰・試験後の状態を本人が判断するための[手順案](MICRO_DOPPLER_PILOT.md)を用意しています。現在は[既存PC APIの適用条件](PC_RAW_API_PATHS.md)を優先して再確認し、FW書換えは保留・未実行です。
+合成実数ADC/複素IQは既知周波数・振幅・符号・全軸・全power値・gap/連番/CRC・到着jitter・保存再生・失敗/中断を検証します。実機では短いADC取得、全53列/6784値/全軸の元bytes再計算・再読込一致、GUIライブ・停止・再開・再生を確認しました。原本・画像はprivateのみです。人の動作分類、物理方向/速度校正、長時間、frame間位相連続性は未実証です。

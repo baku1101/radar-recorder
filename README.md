@@ -1,27 +1,31 @@
-# レーダー収録レビュー 0.4.0
+# レーダー収録・レビュー 0.5.0
 
-個人PCでレーダーの検出イベントとカメラ映像を記録し、同期の不確かさと日本語の区間ラベルを本人が確認するローカルアプリです。0.4.0では別経路で、生ADC/IQの元bytes保存、range FFT・STFTによるmicro-Doppler表示、raw保存ログの再生を追加しました。**接続中CSKの現FWから実測rawを取得する経路はまだ成立していません。** FPGA・行動モデル自動ラベル・学習実行は未実装です。
+個人PCでレーダーと動画を保存・確認するローカルアプリです。0.5.0ではKITCSKBGT60CUTR13TOBO1の実ADC FIFOを独自raw FWからUSB-UARTで読み、range FFT/STFTによるmicro-Dopplerをリアルタイム表示・保存・再生できます。従来の検出点表示・動画同期・日本語ラベル確認も保持しています。学習・FPGA接続は未実装です。
 
-## 起動
+## 起動と実機micro-Doppler
 
-Node.js 22以上が必要です。Windowsでは `start.cmd` を実行し、表示された `http://127.0.0.1:8765` をChromeまたはEdgeで開きます。通常のNode環境では `npm start` も使えます。終了はCtrl+Cです。
+Node.js 22以上が必要です。Windowsで `start.cmd` を実行し、`http://127.0.0.1:8765` をChrome/Edgeで開きます。通常のNode環境では `npm start` も使えます。終了はCtrl+Cです。
 
-```powershell
-cd radar-recorder
-.\start.ps1
-```
+1. 「生波形からのmicro-Doppler」で「CSK 生ADC（専用raw FW）」を選びます。
+2. USBポートを `COM10` にし、「接続して実raw表示・保存を開始」を押します。
+3. 「実機CSK FIFO由来のADC」とframe数を確認し、Hz/m/s軸や表示範囲を選びます。
+4. 「raw取得/処理を停止」で保存とポート解放を待ちます。同じ開始ボタンで新規セッションとして再開できます。停止後は記録を選んで再生・seek・読戻し検証・書出しができます。
 
-ポート変更は `start.ps1 -Port 8766`、保存先変更は `-DataDirectory <絶対パス>`。通常のNode起動では `RADAR_PORT` と `RADAR_DATA_DIR` を指定できます。起動するだけではカメラやレーダーに接続しません。
+この個人PCには `radc-0.2.0` とprivate runtime設定を準備済みです。raw FWは従来の検出/追跡FWを置換しているので、下の検出点表示・レーダー＋カメラ収録には元FWの復旧が必要です。起動だけでは機器接続も書換えもしません。カメラは使いません。
 
-## 生波形からのmicro-Doppler
+GitHubにはメーカーコード・FW binary・private profile・実収録を含めません。新しいPC/基板では別途準備が必要です。[実rawの操作・時計・制限](docs/DIRECT_RAW.md)、[FWビルド](firmware/csk-raw/README.md)、[導入・元FW復旧](docs/MICRO_DOPPLER_PILOT.md)を確認してください。
 
-画面上部の「生波形からのmicro-Doppler」で「合成ADCで処理を確認」を押すと、実機を使わずにADCサンプルからFFT/STFTを計算できます。Hz/m/s切替、表示一時停止、保存ログのseek/再生、元bytes・設定の読戻しとexportに対応します。raw JSONL入力とローカルraw WebSocketの連続入力も利用できます。検出点の時刻―速度グラフは別に残しています。
+`start.ps1 -Port 8766`、`-DataDirectory <絶対パス>`、通常Nodeの `RADAR_PORT` / `RADAR_DATA_DIR` で変更できます。
 
-現在のCSKを選んでも検出点をrawと称して成功にはしません。実測rawは0件で、現物向けの独自UART producer FWはソース・ELF/HEX候補まで準備した段階です。FW書込み、boot/連続raw動作、元FW復元は未実証です。合成の画面と実機の達成状態を区別します。
+## 合成と保存データ
 
-[raw入力・計算・軸・機器経路と制限](docs/MICRO_DOPPLER.md)、[独自CSK FW候補のビルドと残件](firmware/csk-raw/README.md)を参照してください。
+「合成ADCで処理を確認」はセンサーを使いません。実機と合成の由来を画面に残します。既存のraw JSONLやローカルraw WebSocketも入力でき、保存済みADCから全スペクトルを再生できます。検出点の時刻―速度/ビン表示は別欄に保持し、ADCからのスペクトルとは区別します。
 
-## USB / UARTの準備
+[FFT/STFTの仕様と入力契約](docs/MICRO_DOPPLER.md)も参照してください。
+
+## 標準検出FW用のUSB / UARTの準備
+
+以下は従来の検出FWを使う場合です。現在導入済みの専用raw FWでは上の生ADC表示を使用してください。
 
 WindowsのInfineon XENSIV CMOS Radar Visualization Tool **1.1.0**を、メーカーの利用条件に従ってインストールしてください。独自bridgeが、その配布APIの `SerialTransport`、`BinaryProtocol`、`DeviceClient` を別プロセスから呼びます。メーカーのコード・ドライバ・設定プリセットはこのリポジトリに含めていません。
 

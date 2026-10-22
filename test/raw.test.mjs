@@ -30,6 +30,13 @@ test('raw real ADC range FFT and STFT recover known signed tone, physical axes a
  const i=s.frequencies_hz.indexOf(62.5);assert.ok(Math.abs(s.velocities_mps[i]-299792458*62.5/(2*60e9))<1e-12);assert.ok(Math.abs(s.columns[0].power_db[i]-20*Math.log10(16000/32768))<.01);assert.ok(Math.abs(s.range_bin_spacing_m*16-range)<1e-12);
  const negative=syntheticRaw({frames:1,toneHz:-62.5}).frames[0];assert.equal(peak(spectrum(negative)),-62.5);
 });
+test('unsigned little-endian ADC containers keep 16 bits and fast-time DC removal preserves the spectrum',()=>{
+ const cc=validateRawConfig({...c,sample_format:'uint16_le',adc_full_scale:65535}),bytes=Buffer.alloc(cc.frame_bytes),original=rawBytes(fixture.frames[0],c);
+ for(let i=0;i<original.length/2;i++)bytes.writeUInt16LE(original.readInt16LE(i*2)+32768,i*2);
+ const decoded=decodeRaw(Buffer.from([255,255,...bytes.subarray(2)]),cc);assert.equal(decoded.re[0],1);assert.equal(decoded.im[0],0);
+ const actual=microDoppler(bytes,cc,processing,0),expected=spectrum();assert.equal(peak(actual),62.5);
+ for(let i=0;i<actual.columns.length;i++)for(let k=0;k<128;k++)if(expected.columns[i].power_db[k]>-100)assert.ok(Math.abs(actual.columns[i].power_db[k]-expected.columns[i].power_db[k]-20*Math.log10(32768/65535))<1e-6);
+});
 test('range gate excludes unrelated reflectors; static removal is explicit and changes DC power without manufacturing motion',()=>{
  const rejected=spectrum(fixture.frames[0],validateProcessing(c,{range_min_m:range+.5,range_max_m:range+.6}));assert.ok(Math.max(...rejected.columns[0].power_db)<-70);
  const stationary=syntheticRaw({frames:1,toneHz:0}).frames[0],kept=spectrum(stationary),removed=spectrum(stationary,{...processing,remove_static:true});assert.equal(peak(kept),0);assert.ok(Math.max(...kept.columns[0].power_db)>-7);assert.ok(Math.max(...removed.columns[0].power_db)<-120);assert.equal(removed.static_removal,true);

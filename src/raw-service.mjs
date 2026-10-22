@@ -7,19 +7,20 @@ import { atomicJson, fileSha } from './storage.mjs';
 import { localWebSocketUrl } from './live.mjs';
 import { AppError } from './adapters.mjs';
 import { RAW_LIMITS, validateRawConfig, validateProcessing, rawBytes, syntheticRaw, hash } from './raw-dsp.mjs';
+import { CskRawAdapter, rawCskSettings } from './csk-raw.mjs';
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 const durable = (file, bytes) => { const fd=fs.openSync(file,'wx');try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);}finally{fs.closeSync(fd);} };
 const append = (file, value) => {const fd=fs.openSync(file,'a');try{fs.writeFileSync(fd,JSON.stringify(value)+'\n');fs.fsyncSync(fd);}finally{fs.closeSync(fd);}};
 const errorInfo = error => ({ code:error.code??'RAW_CAPTURE_FAILED', message:error.message });
 export const RAW_HARDWARE_STATUS = Object.freeze({
-  implemented:false, code:'CURRENT_CSK_RAW_PATH_UNAVAILABLE',
-  message:'現FWのCSK UARTからraw ADC/IQを取得する経路は未確認です。検出イベントをrawとして処理しません。FWは書き換えていません。',
-  observed_firmware:'indoor_people_localization 0.4.5.dev0+g2b14fe4.d20260212',
-  observed_sensor_name:'BGT60CUTR13', native_smartar_discovery:'No connected devices found',
-  uart_raw_read_command:'not present in installed TerminalCommand enum',
+  implemented:true, code:'CURRENT_CSK_RAW_PATH_UNAVAILABLE',
+  message:'専用raw FWのCSKに接続してADCを取得できます。接続・FW識別は開始時に確認します。標準検出FWのADC転送は未確認で、この経路には使えません。',
+  historical_detection_firmware:'indoor_people_localization 0.4.5.dev0+g2b14fe4.d20260212',
+  observed_sensor_name:'BGT60CUTR13', historical_native_smartar_discovery:'No connected devices found',
+  historical_detection_uart_raw_read_command:'not present in installed TerminalCommand enum',
   confirmed_opn:'KITCSKBGT60CUTR13TOBO1', exact_opn_match:true,
-  firmware_changes:false, rollback_binary:'private main/work/SFlash snapshots read twice with matching hashes; restore write untested',
-  raw_processing_implemented:true, candidate_firmware_built:true, actual_hardware_raw_frames:0,
+  firmware_changes:'app never flashes; independent raw FW must be prepared separately', rollback_binary:'private original main/work/SFlash snapshots retained; restore write untested',
+  raw_processing_implemented:true, candidate_firmware_built:true, direct_uart_transport:'csk_raw_uart',required_firmware:'radc-0.2.0',
 });
 
 // Text envelope transport only. It never sends commands to a device or changes settings.
@@ -39,8 +40,8 @@ class RawSocket {
 }
 
 export class RawService {
-  constructor(root,{canAcquire=()=>true,factory=url=>new RawSocket(url),leaseMs=15000}={}){
-    this.root=path.join(root,'raw-adc');Object.assign(this,{canAcquire,factory,leaseMs});this.runtime=null;this.busy=false;this.jobId=0;this.closed=false;
+  constructor(root,{canAcquire=()=>true,factory=url=>new RawSocket(url),cskFactory=options=>new CskRawAdapter(options),leaseMs=15000}={}){
+    this.root=path.join(root,'raw-adc');Object.assign(this,{canAcquire,factory,cskFactory,leaseMs});this.runtime=null;this.busy=false;this.jobId=0;this.closed=false;
     for(const m of this.list())if(['running','stopping'].includes(m.state)){m.state='interrupted';m.error={code:'RAW_INTERRUPTED',message:'前回のraw処理が中断しました。元bytesを保持しています。新しい取得を開始してください'};this.save(m);}
   }
   dir(id){if(!/^[a-f0-9-]{36}$/.test(id))throw new AppError('INVALID_RAW_ID','raw記録IDが不正です');return path.join(this.root,id);}
@@ -75,22 +76,27 @@ export class RawService {
     atomicJson(this.file(id,meta),metadata);m.records.push({file:bin,metadata_file:meta,sha256:hash(bytes),metadata_sha256:fileSha(this.file(id,meta)),source_sequence:frame.sequence,frame_start_s:frame.frame_start_s});m.frame_count++;m.raw_bytes+=bytes.length;this.save(m);
     const result=await this.compute(bytes,m.config,m.processing,frame.frame_start_s);
     for(const column of result.columns)append(this.file(id,'spectrum.jsonl'),{...column,receiver_sequence:index,source_sequence:frame.sequence});
-    m=this.get(id);m.processed_frames++;m.column_count+=result.columns.length;const {columns,...axes}=result;m.axes=axes;this.save(m);
+    m=this.get(id);m.processed_frames++;m.column_count+=result.columns.length;const {columns,...axes}=result;m.axes=axes;
+    const elapsed=Number(process.hrtime.bigint()-BigInt(received.pc_receive_monotonic_ns))/1e6;
+    if(Number.isFinite(elapsed)&&elapsed>=0){const stats=m.pc_receive_to_processing_ms??{count:0,min:Infinity,max:0,sum:0};stats.count++;stats.min=Math.min(stats.min,elapsed);stats.max=Math.max(stats.max,elapsed);stats.sum+=elapsed;stats.last=elapsed;stats.mean=stats.sum/stats.count;m.pc_receive_to_processing_ms=stats;}
+    m.last_pc_receive_unix_ms=received.pc_receive_unix_ms;this.save(m);
   }
   ensureIdle(){if(this.closed)throw new AppError('RAW_CLOSED','アプリが終了中です',409);if(this.runtime)throw new AppError('RAW_ALREADY_RUNNING','別のraw処理が動作中です',409);}
-  async start({transport,url,header,processing,request_id}={}){
+  async start({transport,url,header,processing,request_id,port}={}){
     if(this.runtime&&request_id&&this.runtime.request_id===request_id)return this.get(this.runtime.id);
-    this.ensureIdle();if(transport==='csk_current_firmware')throw new AppError(RAW_HARDWARE_STATUS.code,RAW_HARDWARE_STATUS.message,409);
-    if(!['synthetic_raw','local_websocket_raw_adc'].includes(transport))throw new AppError('RAW_TRANSPORT_UNSUPPORTED','未対応のraw取得経路です');
-    const live=transport==='local_websocket_raw_adc';if(live&&!this.canAcquire())throw new AppError('LIVE_SOURCE_BUSY','別の取得を停止してからraw取得を開始してください',409);
-    if(live)localWebSocketUrl(url);
-    const fixture=live?null:syntheticRaw(),m=this.create(live?header:fixture.header,processing,{kind:transport,network:live?'loopback producer':'none',hardware:live?'source-declared; not independently verified':'none'});
+    this.ensureIdle();if(transport==='csk_current_firmware')throw new AppError(RAW_HARDWARE_STATUS.code,'標準検出FWのCSKをraw ADCとして扱いません。専用raw FWの取得元を選択してください',409);
+    if(!['synthetic_raw','local_websocket_raw_adc','csk_raw_uart'].includes(transport))throw new AppError('RAW_TRANSPORT_UNSUPPORTED','未対応のraw取得経路です');
+    const csk=transport==='csk_raw_uart',live=transport!=='synthetic_raw';if(live&&!this.canAcquire())throw new AppError('LIVE_SOURCE_BUSY','別の取得を停止してからraw取得を開始してください',409);
+    if(transport==='local_websocket_raw_adc')localWebSocketUrl(url);
+    const settings=csk?rawCskSettings():null,fixture=live?null:syntheticRaw(),m=this.create(csk?settings.header:live?header:fixture.header,processing,{kind:transport,network:csk?'none':live?'loopback producer':'none',hardware:csk?'CSK FIFO via independent raw firmware':live?'source-declared; not independently verified':'none',...(csk?{port:port??'COM10'}:{})});
     const runtime=this.runtime={id:m.id,request_id,live,stop:false,heartbeat:performance.now()};this.busy=live;m.state='running';this.save(m);
     runtime.job=(async()=>{try{
-      if(live){runtime.adapter=this.factory(url);await runtime.adapter.open();while(!runtime.stop){if(performance.now()-runtime.heartbeat>this.leaseMs)throw new AppError('RAW_HEARTBEAT_LOST','画面からの確認が途絶えたためraw取得を停止しました');const item=runtime.adapter.read();if(item)await this.ingest(m.id,JSON.parse(item.text),item.text,item);else await wait(10);}await runtime.adapter.stop();for(;;){const item=runtime.adapter.read();if(!item)break;await this.ingest(m.id,JSON.parse(item.text),item.text,item);}}
+      if(live){runtime.adapter=csk?this.cskFactory({port:port??'COM10',settings,dir:this.dir(m.id)}):this.factory(url);await runtime.adapter.open();
+        if(csk){const current=this.get(m.id);atomicJson(this.file(m.id,'source-config.json'),{declared:settings.header,device_applied:runtime.adapter.metadata,requested_registers:settings.requested_registers,source:current.source});current.config_sha256=fileSha(this.file(m.id,'source-config.json'));current.firmware_identity_confirmed=true;current.applied_config_validation=runtime.adapter.metadata?.register_readback_validation??'unknown';this.save(current);}
+        while(!runtime.stop){if(performance.now()-runtime.heartbeat>this.leaseMs)throw new AppError('RAW_HEARTBEAT_LOST','画面からの確認が途絶えたためraw取得を停止しました');const item=runtime.adapter.read();if(item){await this.ingest(m.id,JSON.parse(item.text),item.text,item);if(csk){const current=this.get(m.id);current.real_hardware_raw_verified=true;this.save(current);}}else await wait(10);}await runtime.adapter.stop();for(;;){const item=runtime.adapter.read();if(!item)break;await this.ingest(m.id,JSON.parse(item.text),item.text,item);}}
       else for(const frame of fixture.frames){if(runtime.stop)break;await this.ingest(m.id,frame,JSON.stringify(frame));await wait(100);}
       const final=this.get(m.id);final.state=runtime.stop?'stopped':'completed';this.save(final);
-    }catch(error){const final=this.get(m.id);final.state='error';final.error=errorInfo(error);this.save(final);}finally{await runtime.adapter?.stop();const final=this.get(m.id);final.source_messages_not_saved=runtime.adapter?.discarded??0;final.envelopes_sha256=fileSha(this.file(m.id,'raw.envelopes.jsonl'));final.spectrum_sha256=fileSha(this.file(m.id,'spectrum.jsonl'));this.save(final);this.runtime=null;this.busy=false;}})();return this.get(m.id);
+    }catch(error){const final=this.get(m.id);final.state='error';final.error=errorInfo(error);this.save(final);}finally{await runtime.adapter?.stop();const final=this.get(m.id);final.source_messages_not_saved=runtime.adapter?.discarded??0;if(csk)final.transport_diagnostics=runtime.adapter?.diagnostics();final.envelopes_sha256=fileSha(this.file(m.id,'raw.envelopes.jsonl'));final.spectrum_sha256=fileSha(this.file(m.id,'spectrum.jsonl'));this.save(final);this.runtime=null;this.busy=false;}})();return this.get(m.id);
   }
   async importFile(staged,processing){
     this.ensureIdle();let m, runtime, iterator;
@@ -109,7 +115,7 @@ export class RawService {
   }
   verify(id){const m=this.get(id),errors=[];for(const r of m.records)for(const [name,expected]of [[r.file,r.sha256],[r.metadata_file,r.metadata_sha256]]){try{if(fileSha(this.file(id,name))!==expected)errors.push(name);}catch{errors.push(name);}}
     for(const [name,expected]of [['source-config.json',m.config_sha256],['processing.json',m.processing_sha256],['source.raw.jsonl',m.source_sha256],['raw.envelopes.jsonl',m.envelopes_sha256],['spectrum.jsonl',m.spectrum_sha256]])if(expected&&fileSha(this.file(id,name))!==expected)errors.push(name);
-    const actualBins=fs.readdirSync(this.dir(id)).filter(x=>/^adc-\d+\.bin$/.test(x)).length;if(actualBins!==m.frame_count)errors.push('unindexed raw files');if(m.processed_frames!==m.frame_count)errors.push('unprocessed raw frames');if(['running','stopping'].includes(m.state))errors.push('capture still running');return {ok:!errors.length,errors,frames:m.frame_count,processed:m.processed_frames,device_loss:m.device_loss,provenance:m.provenance};
+    const actualBins=fs.readdirSync(this.dir(id)).filter(x=>/^adc-\d+\.bin$/.test(x)).length;if(!m.frame_count)errors.push('no raw frames');if(actualBins!==m.frame_count)errors.push('unindexed raw files');if(m.processed_frames!==m.frame_count)errors.push('unprocessed raw frames');if(['running','stopping'].includes(m.state))errors.push('capture still running');return {ok:!errors.length,errors,frames:m.frame_count,processed:m.processed_frames,device_loss:m.device_loss,provenance:m.provenance};
   }
   exportFiles(id){if(!this.verify(id).ok)throw new AppError('RAW_READBACK_FAILED','raw読み戻し検証に失敗しました');return fs.readdirSync(this.dir(id)).filter(name=>/^[a-zA-Z0-9.-]+$/.test(name)).map(name=>({name,path:this.file(id,name)}));}
   async close(){this.closed=true;if(this.runtime)await this.stop(this.runtime.id);await this.worker?.terminate();}

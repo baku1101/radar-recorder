@@ -1,38 +1,35 @@
-# 実測rawへの切替試験案（書換え保留・未実行）
+# CSK raw FWの導入記録と元FWの復旧
 
-目的は、現物KITCSKBGT60CUTR13TOBO1でADC FIFO→元bytes保存→range FFT/STFT→連続画面更新を実証し、普段使えるraw取得経路を用意することです。ここまでのスペクトル試験は合成で、実測rawは0件です。
+2026-10-22、本人の「機能がなければ追加し、生データからリアルタイム描画まで」の明示指示に基づき、同一個人PC・同一kitへ独自raw FWを導入しました。元の検出FWはprivate backupに保持しています。アプリ起動・通常の開始/停止はflashを書きません。
 
-## 準備した候補
+## 現在のartifactと対象
 
-- private HEX: `.runtime/csk-raw-build-long128/csk-raw-main-flash-only.hex`
-- SHA256: `898377ea2c1edcd47f7e4f185b88ebe699764c1e306d207dc7b026f3c3f10904`
-- 対象MCU: 実機SWDでCY8C624AFNI-S2D43、main flash 2MiB、protection NORMALを確認。公式同一part/BSPのstartup/linkerを使用。
-- HEX data: 41444 bytes、`0x10000000..0x1000A913`。独立監査で全record checksumとCM0+/CM4 vector、CM4 Reset_Handlerの整合を確認。SFlash/eFuse/QSPI向けdataなし。実機bootは未確認。
-- profile: 公式Japan profileから同梱HALでオフライン生成したB-step候補。128 chirp×1RX×64 sample、ADCの16回平均を維持、Fs 5MHz、Tc 501.225µs、約99.9614375ms/frame。保存済みID_HW値と同梱定義から現物をB-stepと識別。候補FW自身も設定前のID不一致なら停止。
-- 128点窓64.1568ms、15.586812Hz/bin、約0.0384449m/s/bin、Nyquist約±2.46047m/s。窓とframe間gap約35.8046msをつながない。これはbin間隔で、分離性能の実証ではない。
-- UART 2Mbaud 8N1、約164.2kB/s、理論上限の82.1%。連続伝送の余裕・ADC coding/位相安定性・RF/clock実値は未確認。
+- FW: `radc-0.2.0` / protocol `RADC0001`
+- private HEX: `.runtime/csk-raw-build-live4/csk-raw-main-flash-only.hex`
+- SHA256: `90aaad323ddb40785fe7c33ae45929ded5f89d0d7ade3f7dbb9e002f36971605`
+- 対象: KITCSKBGT60CUTR13TOBO1、実MCU CY8C624AFNI-S2D43、main 2MiB、protection NORMAL。radar ID_HW=0x00098185（B-step）を設定前に照合。
+- HEX data 44628 bytes、`0x10000000..0x1000B583`。programmerのsector paddingは45056 bytes。main以外のdataを除外し、checksum/vector/addressを監査。SFlash/eFuse/QSPI/保護状態は変更していません。
+- profile: 128chirp×1RX×64sample、Fs5MHz、Tc501.225µs、frame99.9614375ms、ADC averaging16、2Mbaud8N1。[時計・軸・制限](DIRECT_RAW.md)を参照。
 
-profileは未適用です。1RXなので角度推定を提供しません。現FWの検出/追跡イベントはこの候補FWでは提供しません。検出点グラフと従来の検出点収録を使う場合は元FWへ戻す必要があります。
+最終状態はraw FW、取得停止・COM解放です。通常使用は[起動手順](DIRECT_RAW.md)によります。従来の検出・追跡UARTとは互換ではありません。
 
-## 既存FWの保全と限界
+## 実施と範囲
 
-許可されたbackup調査で、main 2MiB・work 32KiB・SFlash 32KiBをhalt下で各2回privateへ読み、各bank全bytes/hash一致を確認しました。読出し約11秒後にreset runし、元FW同一版のGET、検出6件、disconnectを確認しました。FW書込み・erase・保護変更はしていません。
+元main 2MiBを保存済みbackupと実flashで全verifyしてから、必要なmain sectorだけprogram/verifyしました。初期化のUART backpressure、HAL interface pin、sensor clock startupを修正し、計4回のmain program/verifyを実施しました。最初の3候補はSTART前の識別で停止しADC0でした。4番目で実ADC取得に成功しました。復旧書込みは未試験です。
 
-metadata、registerの件数/順序と0x0004〜0x1BFFの読戻し値は一致しました。ADC校正・MD status/target/test・SEQ_BUFFERを含む305項目は不一致です。SEQ_BUFFER差の原因はunknownで、全設定の完全復元とは主張しません。backupには外部QSPI・eFuse・RAMを含みません。実際にbackupを書き戻した復元試験も未実施です。
+最初の実取得はSTART→STOP約5.294秒・53frame。GUIの短い確認は10frame/約1.053秒、早すぎるテストSTOPで0frame/約0.089秒、修正後の再開9frame/約0.959秒です。GUIの失敗は待機条件・文言期待の誤りとして修正し、0frameを成功件数に含めません。実ADCは合計72frame、START→STOP合計約7.395秒（0frameの約0.089秒を含む）です。要求の5秒＋必要な短い再試験の範囲で実施し、人間が指定した累積時間/試行数の数値上限は未設定でした。長時間試験・学習は行っていません。
 
-## 承認を得てから行う範囲
+## 元FWの保全
 
-1. 元backupと候補HEXのhashを再照合し、ポートを使用するアプリがある場合は中止する。
-2. 公式OpenOCDでmain flashの必要sectorだけをerase/program/verifyする。SFlash/eFuse/QSPI・保護状態は変更しない。これはbackup読取りとは別のFW変更操作で、最終FW状態も含めて本人が選択した範囲に限定する。
-3. reset後に独自FWのidle応答とsilicon ID照合を確認し、既知の`RADC_START`で上記raw profileを適用する。カメラなしで5秒記録し、CRC・shape・連番/欠損、元bytes、設定読戻し、timing、STFT連続更新と保存再生を確認する。実測であることと、動作識別ができたかを分けて報告する。
-4. STOP・port解放。異常時は試験を打ち切り、保全した元main imageの`0x10000000..0x101fffff`を書き戻してverify、reset、元FW版/出力を確認する。work/SFlashは候補FWが書かない設計で、追加書込みを前提にしない。復帰できない場合もerase/unlock/保護解除へ広げず停止する。
+元は `indoor_people_localization 0.4.5.dev0+g2b14fe4.d20260212` / sensor_driver0.5.12です。許可されたSWD readでmain2MiB、work32KiB、supervisory flash32KiBを各2回privateに保存し、各bankの全bytes/hash一致を確認しました。読出し後の元FW起動・GET・検出・disconnectは確認済みです。QSPI/eFuse/RAMはbackup対象外です。
 
-## 最終状態の選択
+保全ファイルはローカルの `evidence/private-backup-20261021/` にあります。Gitには含めません。mainの現在候補を書き戻す操作と、元mainを復旧する操作を区別してください。work/supervisory flashはこのraw FWで書きません。元register dumpの動的/校正/SEQ_BUFFER等には差があり、全実設定の完全復元を主張しません。
 
-本人に、試験後の状態も含めて選択してもらいます。
+## 復旧する場合の手順（今回は未実行）
 
-- **試験後に元FWへ戻す**: raw取得を短時間検証してから元mainを復元する。復元書込み自体の実証も得るが、普段の画面は元の検出点取得へ戻る。
-- **復元を確認したうえで、成功時はraw FWを維持する**: 5秒試験→元FW復元確認→成功時に同じ候補を再適用する。以後micro-Doppler用rawを取得できる状態を目指す。従来の検出/追跡は使えなくなる。これらのmain flash erase/programを含めて事前に承認を得る。
-- **今は書き換えない**: 現FWを維持し、実測raw未達成のまま、ソフトと候補artifactを保管する。
+1. アプリで取得を停止し終了します。他アプリがポート使用中なら作業しません。対象kit/MCU、元backup2ファイルの長さ・hash一致を確認します。
+2. 公式OpenOCDの `interface/kitprog3.cfg` と `target/psoc6.cfg` を使い、`init; reset halt` 後、main bankだけを対象にします。
+3. 既知の元mainを `flash write_image erase <private-main-1.bin> 0x10000000 bin`、続けて `verify_image <private-main-1.bin> 0x10000000 bin` で照合します。アドレス範囲は `0x10000000..0x101FFFFF` のみです。
+4. `reset run; shutdown`、元FWの版/GET/検出を確認して切断します。保護解除・全chip erase・別領域書込みへ広げません。verifyが失敗したら停止して原因を確認します。
 
-現在は既存公式PC APIと現FWのraw出力条件を再確認するため、書換えを保留しています。最終FW状態を含む具体的な作業範囲が確定する前には実行しません。build成功・backup読出し成功を、raw実測や復元書込みの成功にしません。[取得経路の再確認](PC_RAW_API_PATHS.md)を参照してください。
+元FWの完全な再書込み復帰はまだ実証していません。backup read/hash一致を復旧成功と同一視しません。この手順はレビュー用で、開始時のアプリが自動実行する機能ではありません。

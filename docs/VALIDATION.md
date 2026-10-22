@@ -1,5 +1,16 @@
 # 検証範囲と実施履歴
 
+## 0.5.0 実機ADCとmicro-Doppler（2026-10-22）
+
+ローカルの合成unit/HTTP/mockは **91/91**、合成micro-Doppler GUIは **14/14** 通過。新規CSK adapterは独立packet/clock保持、有限queue、readback不一致停止、校正領域差のunknown保持、停止・保存・再読込をmockで検証。uint16 little endian・DC除去・既知スペクトルの数値回帰も追加しました。FWのUART writerはARM emulationで一時0byte/partial writeと有限timeoutを検証しました。
+
+同一kitに独自raw FWを導入し、実ADCを53frame、GUI10frame、再開9frame取得しました。元UARTとADCの対応、全53列/6784 power値/全軸の再計算・新規service再読込の完全一致を確認。CRC0、STOP応答、COM解放を確認し、実GUIで更新・停止・新ID再開・保存再生・読戻しを確認しました。GUI試験の旧セッション待機条件を修正し、早期STOPの0frame試行は成功数に含めません。必要な収録時間、FW/hash、復旧未試験の範囲は[導入記録](MICRO_DOPPLER_PILOT.md)、coding/clock/校正20読戻し差は[実rawガイド](DIRECT_RAW.md)に記載しています。
+
+元ADC・画像・register dump・backupはGit対象外です。これは短い取得・ソフト処理の検証で、人の動作の正解、物理方向/速度校正、frame間coherence、取得→表示の物理遅延、長時間安定性、学習・FPGAの実証ではありません。
+
+以下は従来バージョンの検証履歴です。
+
+
 ## 0.3.0の検出点ドップラー表示（2026年10月21日）
 
 Windows・Node.js 24.19.0で、合成unit/HTTP **62/62**を通過。新しい12件は、属性列順と負/ゼロの元値、未知値を補わないこと、決定的な間引きと省略数、時刻範囲、5000件以降・末尾2 MiBの読取り、非同期yield、部分行/過大行/中止、保存ログ非変更、メモリ上限、表示停止中の受信、画面生存確認、切断、開始途中の停止、重複停止、解放完了までの排他、HTTP token/URL/ADC制約を検証する。
