@@ -1,6 +1,11 @@
-﻿param([ValidateRange(1,65535)][int]$Port = 8765, [switch]$SkipServerCheck, [switch]$ListPorts)
+﻿param([ValidateRange(1,65535)][int]$Port = 8765, [switch]$SkipServerCheck, [switch]$ListPorts, [switch]$NetworkOnly, [string]$Proxy = '', [switch]$UseSystemProxy, [switch]$ProxyUseDefaultCredentials)
 . (Join-Path $PSScriptRoot 'scripts\windows-common.ps1')
+. (Join-Path $PSScriptRoot 'scripts\setup-network.ps1')
 try {
+    $network=Get-SetupNetworkPolicy -AppRoot $PSScriptRoot -Proxy $Proxy -UseSystemProxy:$UseSystemProxy -ProxyUseDefaultCredentials:$ProxyUseDefaultCredentials
+    Write-Host ('Download policy: '+$network.Source+' / proxy authentication: '+$network.Authentication+' / origin credentials disabled')
+    Write-Host 'proxy URLや認証情報は表示しません。設定選択だけの確認で、接続や認証成功の検証ではありません。'
+    if($NetworkOnly){exit 0}
     $runtime = Get-PortableRuntime $PSScriptRoot
     $lockHash = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot 'windows-runtime.lock.json') -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($runtime.Marker.lock_sha256 -ne $lockHash) { throw '依存の版が変わっています。setup.cmdを再実行してください。' }

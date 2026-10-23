@@ -1,6 +1,6 @@
 {
   "name": "radar-recorder-local",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "type": "module",
   "description": "Local radar detection and camera recorder with Japanese review UI",

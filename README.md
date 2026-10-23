@@ -1,4 +1,6 @@
-# レーダー収録・レビュー 0.6.0
+# レーダー収録・レビュー 0.6.1
+
+Windows登録済みproxyで407になる場合は、更新後に `setup.cmd -UseSystemProxy -ProxyUseDefaultCredentials` を使えます。現在のWindowsユーザーによるproxy宛の統合認証だけを有効にし、パスワード保存やOS設定変更は行いません。[proxy設定・未対応条件](docs/WINDOWS_SETUP.md#proxy)を参照してください。
 
 個人PCでレーダーと動画を保存・確認するローカルアプリです。0.5.0ではKITCSKBGT60CUTR13TOBO1の実ADC FIFOを独自raw FWからUSB-UARTで読み、range FFT/STFTによるmicro-Dopplerをリアルタイム表示・保存・再生できます。従来の検出点表示・動画同期・日本語ラベル確認も保持しています。学習・FPGA接続は未実装です。
 

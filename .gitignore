@@ -13,3 +13,5 @@ test/check-existing-evidence.mjs
 *.zip
 *.tar.gz
 .DS_Store
+
+setup-network.local.json

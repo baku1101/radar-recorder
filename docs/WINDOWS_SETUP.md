@@ -41,3 +41,43 @@ COM番号はWindowsのデバイスマネージャー「ポート(COMとLPT)」�
 ## 配布物の生成
 
 開発者はソースをGitに追加してprivacy auditを通した後、`scripts/package-windows.ps1 -OutputDirectory <出力先> -CacheDirectory <固定packageのフォルダ>` でonline/offline ZIPを作れます。追跡ファイルだけを列挙し、private directory/ADC/FW binaryを拒否します。offline版に追加するのはlockに一致する公式依存archive3個だけです。pyserialの公式ライセンス原文はsource内にも保持します。`DISTRIBUTION.json` にsource commit・ファイルhash一覧を、ZIPの隣にSHA256を保存します。
+# <a id="proxy"></a>Windows登録済みproxyで407になる場合（0.6.1以降）
+
+Gitから取得したフォルダでは、取得・アプリを終了してから更新し、次を実行します。セットアップが失敗してアプリをまだ起動していなければ、そのまま更新できます。
+
+```powershell
+git pull --ff-only
+.\setup.cmd -UseSystemProxy -ProxyUseDefaultCredentials
+.\doctor.cmd -NetworkOnly -UseSystemProxy -ProxyUseDefaultCredentials
+```
+
+Windowsのインターネットオプションに登録された手動proxy・自動検出・PACをOS/.NETへ解決させます。`-ProxyUseDefaultCredentials` は利用者の明示選択で、現在のWindowsアカウントをproxyのNegotiate/NTLM/Kerberos応答だけに使います。配布元向けの `UseDefaultCredentials` は無効で、Basic認証へ現在ユーザーの資格情報を渡しません。パスワードprompt、Credential Manager読出し、資格情報の保存はありません。会社の実proxy・実PAC・実統合認証は未検証です。407というエラーだけでは、そのproxyがこれらの方式に対応するか判定できません。
+
+毎回指定せずアプリ内に選択を保存する場合は、`setup-proxy.cmd` を実行するか、次を使います。保存するのはproxyの選択と認証方式だけです。Windowsやネットワークの設定を変更しません。
+
+```powershell
+.\setup-proxy.cmd -UseSystemProxy -ProxyUseDefaultCredentials
+.\setup.cmd
+```
+
+手動proxyを指定する場合の例です。実際のホスト名・portは社内ITの案内に従ってください。ユーザー名・パスワード・tokenをURLへ含めないでください。userinfo/path/query/fragmentを含む入力は、値を表示せず拒否します。
+
+```powershell
+.\setup.cmd -Proxy http://proxy.example.invalid:8080 -ProxyUseDefaultCredentials
+```
+
+選択の優先順位は、明示した `-Proxy` / `-UseSystemProxy` → アプリ内 `setup-network.local.json` → `HTTPS_PROXY` → `HTTP_PROXY` → Windows既定設定です。認証は指定しなければ無効です。環境変数からproxyを採用した場合のみ、`NO_PROXY` のcomma区切りhost/domain[:port]、`*`も使います。明示指定とアプリ内設定は環境のbypassを引き継ぎません。環境変数自体やOS設定は書き換えません。
+
+Node/Python/pyserialの全取得に同じpolicyを使い、ダウンロード後は固定SHA256を検査します。失敗した一時ファイルだけを除去し、既存runtimeの参照は変更しません。proxy拒否時にdirect接続や別mirrorへ切り替えません。offline ZIP／`-Offline`ではネットワークとproxy設定を使用しません。ローカル設定ファイルはGit・配布ZIPから除外します。
+
+| 表示 | 次の確認 |
+|---|---|
+| `SETUP_PROXY_AUTH_REQUIRED` / 407 | 上のWindows統合認証指定を確認。残る場合、Basic専用・別方式・権限不足などを社内ITへ確認。パスワードをチャットへ送らないでください。 |
+| `SETUP_NETWORK_TLS` | 社内証明書・配布先の許可をITへ確認。SSL検証を無効化したり、証明書を自動導入したりしません。 |
+| `SETUP_NETWORK_DNS` / `CONNECT` | proxy名・接続先の到達性・社内の接続許可を確認。 |
+| `SETUP_NETWORK_TIMEOUT` | 応答時間切れ。正常なcache/runtimeは保持します。 |
+| `SETUP_NETWORK_HTTP` | 表示されたHTTP statusと接続許可を確認。応答本文や認証headerは表示しません。 |
+
+`doctor -NetworkOnly` は設定選択の確認だけで、接続・認証の成功試験ではありません。パスワードが必要なBasic専用proxy等には、この機能だけで対応したとは言えません。会社の許可に従ってITへ確認するか、許可されたoffline配布物を利用してください。
+
+Microsoftの根拠：[GetSystemWebProxy（現在ユーザーの自動検出/PAC/手動設定）](https://learn.microsoft.com/en-us/dotnet/api/system.net.webrequest.getsystemwebproxy?view=netframework-4.8.1)、[proxyのCredentialsと407](https://learn.microsoft.com/en-us/dotnet/api/system.net.webproxy.credentials?view=netframework-4.8.1)。実装はPS5.1の.NET Framework HttpClientHandlerを使用し、originとproxyの資格情報を分離しています。

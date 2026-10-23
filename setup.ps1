@@ -1,11 +1,14 @@
-﻿param([string]$CacheDirectory = '', [switch]$Offline)
+﻿param([string]$CacheDirectory = '', [switch]$Offline, [string]$Proxy = '', [switch]$UseSystemProxy, [switch]$ProxyUseDefaultCredentials)
 # PowerShell 5.1; application-local, versioned runtimes. No installer, registry or PATH edits.
 . (Join-Path $PSScriptRoot 'scripts\windows-common.ps1')
+. (Join-Path $PSScriptRoot 'scripts\setup-network.ps1')
 try {
     if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITEW6432 -eq 'ARM64' -or $env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { throw 'この配布物はWindows 10/11 x64専用です。ARM64/32bit版には対応していません。' }
     if ([Environment]::OSVersion.Version.Major -lt 10) { throw 'Windows 10または11が必要です。' }
     $distribution=Join-Path $PSScriptRoot 'DISTRIBUTION.json'
     if (Test-Path -LiteralPath $distribution) { if ((Read-JsonFile $distribution).mode -eq 'offline') { $Offline=$true } }
+    if($Offline){$network=@{Source='offline cache only';Authentication='none'}}else{$network=Get-SetupNetworkPolicy -AppRoot $PSScriptRoot -Proxy $Proxy -UseSystemProxy:$UseSystemProxy -ProxyUseDefaultCredentials:$ProxyUseDefaultCredentials}
+    Write-Host ('Download policy: '+$network.Source+' / proxy authentication: '+$network.Authentication+' (origin credentials disabled)')
     if (-not $CacheDirectory) { $CacheDirectory = Join-Path $PSScriptRoot 'packages' }
     $CacheDirectory = [IO.Path]::GetFullPath($CacheDirectory)
     New-Item -ItemType Directory -Force -Path $CacheDirectory | Out-Null
@@ -30,9 +33,11 @@ try {
                 if ($Offline) { throw ('offline packageがありません: ' + $package.filename) }
                 Write-Host ('公式配布から取得しています: ' + $package.id + ' ' + $package.version)
                 $partial = $archive + '.' + [guid]::NewGuid().ToString('N') + '.part'
-                Invoke-WebRequest -UseBasicParsing -Uri $package.url -OutFile $partial -TimeoutSec 180
-                if ((Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash.ToLowerInvariant() -ne $package.sha256) { throw ('SHA256不一致です。実行していません: ' + $package.filename) }
-                Move-Item -LiteralPath $partial -Destination $archive
+                try {
+                    Invoke-SetupDownload -Uri $package.url -OutFile $partial -Policy $network -TimeoutSeconds 180
+                    if ((Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash.ToLowerInvariant() -ne $package.sha256) { throw ('SHA256不一致です。実行していません: ' + $package.filename) }
+                    Move-Item -LiteralPath $partial -Destination $archive
+                } finally { if(Test-Path -LiteralPath $partial) { Remove-Item -LiteralPath $partial -Force } }
             }
             if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne $package.sha256) { throw ('packageのSHA256不一致です。packages内の該当ファイルを除いて再取得してください: ' + $package.filename) }
             Write-Host ('SHA256 OK: ' + $package.filename)
