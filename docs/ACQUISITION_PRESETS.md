@@ -1,6 +1,6 @@
-# 取得条件の切替候補 0.7.0-rc.2
+# 取得条件の切替候補 0.7.0-rc.3
 
-この版はソフトウェア・FWビルド・模擬通信を確認した候補版です。新FW `radc-0.3.0` の実機書込み・起動・新profileでのADC取得は行っていません。稼働中のアプリ、センサー、既存データには変更を加えていません。stable v0.6.0と、実機で動作確認済みの `radc-0.2.0` は維持します。
+この版はソフトウェア・FWビルド・模擬通信を確認した候補版です。本書は全profileの実機取得成功を保証するものではありません。機器ごとの導入・取得検証の範囲は、操作者が保持する記録で確認してください。stable v0.6.0と、実機で動作確認済みの `radc-0.2.0` は維持します。
 
 ## 使い方と互換性
 
@@ -61,3 +61,5 @@ cd radar-recorder-candidate
 `set_frame_rate_Hz(self, frame_rate_hz: float, sequence_idx=None, with_timer=False, timer_idx=0)` の宣言はHz単位、対象sequenceのframe繰返し率です。変更したNs/Nc等との組合せでは要求とgetterの不一致を観測したため、その組合せを採用していません。SDK不具合とは断定せず、原因未分離として独立周期指定を未対応にしています。
 
 FWの独自ソースは `main-config.c` / `radc_config.c`、旧0.2ビルドは変更しない `main.c` です。private tableを `--catalog` で与え、既存公式依存を `--dependency-root` で読み込んでビルドします。アプリからflashは実行しません。[実機適用前のレビュー](ACQUISITION_FW_REVIEW.md)を参照してください。
+
+RADC0002の名称はINFO JSON内にも現れます。hostは長さ・flags・CRCを検査してからbinary packetと判定し、その後にshape/hashを照合します。START受理前の受信異常がある場合はSTARTを許可しません。

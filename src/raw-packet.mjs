@@ -6,8 +6,12 @@ export class RawPacketParser extends EventEmitter {
  constructor({frameBytes,expectedConfigSha256,maxBuffer=2*1024*1024}={}){super();if(!Number.isSafeInteger(frameBytes)||frameBytes<1||frameBytes>1024*1024)throw new Error('frameBytes required');this.frameBytes=frameBytes;this.expectedConfigSha256=expectedConfigSha256;this.maxBuffer=maxBuffer;this.buffer=Buffer.alloc(0);this.skippedBytes=0;this.crcErrors=0;this.previous=null;}
  push(chunk){this.buffer=Buffer.concat([this.buffer,chunk]);if(this.buffer.length>this.maxBuffer)throw new Error('RADC receive buffer overflow');
   for(;;){const a=this.buffer.indexOf(RADC_MAGIC),b=this.buffer.indexOf(RADC_CONFIG_MAGIC),pos=a<0?b:b<0?a:Math.min(a,b);if(pos<0){const keep=Math.min(7,this.buffer.length);this.skippedBytes+=this.buffer.length-keep;this.buffer=this.buffer.subarray(this.buffer.length-keep);return;}if(pos){this.skippedBytes+=pos;this.buffer=this.buffer.subarray(pos);}if(this.buffer.length<32)return;
-   const configured=this.buffer.subarray(0,8).equals(RADC_CONFIG_MAGIC),headerBytes=configured?64:32;if(this.buffer.length<headerBytes)return;const h=this.buffer.subarray(0,headerBytes),n=h.readUInt32LE(8);if(configured&&n!==this.frameBytes)throw new Error('RADC configuration frame shape changed');if(n!==this.frameBytes||h.readUInt32LE(configured?56:24)!==0){this.skippedBytes++;this.buffer=this.buffer.subarray(1);continue;}if(this.buffer.length<headerBytes+n)return;
+   const configured=this.buffer.subarray(0,8).equals(RADC_CONFIG_MAGIC),headerBytes=configured?64:32;if(this.buffer.length<headerBytes)return;const h=this.buffer.subarray(0,headerBytes),n=h.readUInt32LE(8);
+   // INFO text may contain the magic as a protocol name. Only a bounded,
+   // zero-flags, CRC-valid binary packet can establish a shape/hash change.
+   if(!n||n>1024*1024||(!configured&&n!==this.frameBytes)||h.readUInt32LE(configured?56:24)!==0){this.skippedBytes++;this.buffer=this.buffer.subarray(1);continue;}if(this.buffer.length<headerBytes+n)return;
    const payload=this.buffer.subarray(headerBytes,headerBytes+n),expected=h.readUInt32LE(headerBytes-4);if(crc32([h.subarray(0,headerBytes-4),payload])!==expected){this.crcErrors++;this.skippedBytes++;this.buffer=this.buffer.subarray(1);continue;}
+   if(configured&&n!==this.frameBytes)throw new Error('RADC configuration frame shape changed');
    if(this.expectedConfigSha256&&(!configured||h.subarray(24,56).toString('hex')!==this.expectedConfigSha256))throw new Error('RADC configuration hash changed within session');
    const sequence=h.readUInt32LE(12),tick=h.readUInt32LE(16),queueDrops=h.readUInt32LE(20);
    const discontinuity=this.previous!==null&&sequence!==((this.previous+1)>>>0);this.previous=sequence;

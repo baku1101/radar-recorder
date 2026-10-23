@@ -1,8 +1,8 @@
-# レーダー収録・レビュー 0.7.0-rc.2
+# レーダー収録・レビュー 0.7.0-rc.3
 
 Windows登録済みproxyで407になる場合は `setup.cmd -UseSystemProxy -ProxyUseDefaultCredentials` を使えます。パスワード保存やOS設定変更は行いません。[proxy設定](docs/WINDOWS_SETUP.md#proxy)を参照してください。
 
-**取得条件切替の候補版です。新FW radc-0.3.0は未書込み・実機未試験です。** [10プリセット・操作と制約](docs/ACQUISITION_PRESETS.md) / [実機適用前のレビュー](docs/ACQUISITION_FW_REVIEW.md)。[実機確認済みstable v0.6.0](https://github.com/baku1101/radar-recorder/releases/tag/v0.6.0)はそのまま利用できます。旧radc-0.2.0での標準取得も維持しています。
+**取得条件切替は新FW radc-0.3.0向けの候補機能です。導入・取得条件の検証状況は操作者の記録で確認してください。** [10プリセット・操作と制約](docs/ACQUISITION_PRESETS.md) / [実機適用前のレビュー](docs/ACQUISITION_FW_REVIEW.md)。[実機確認済みstable v0.6.0](https://github.com/baku1101/radar-recorder/releases/tag/v0.6.0)はそのまま利用できます。旧radc-0.2.0での標準取得も維持しています。
 
 個人PCでレーダーと動画を保存・確認するローカルアプリです。0.5.0ではKITCSKBGT60CUTR13TOBO1の実ADC FIFOを独自raw FWからUSB-UARTで読み、range FFT/STFTによるmicro-Dopplerをリアルタイム表示・保存・再生できます。従来の検出点表示・動画同期・日本語ラベル確認も保持しています。学習・FPGA接続は未実装です。
 

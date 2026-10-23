@@ -36,6 +36,7 @@ export class CskRawAdapter{
    this.lines.on('line',line=>{let m;try{m=JSON.parse(line);}catch{return;}if(m.kind==='progress'){try{this.onProgress(m.phase);}catch(e){this.failure=e;finish(e);return;}}if(m.kind==='error'){this.failure=new AppError('RAW_CSK_CONNECTION_FAILED',m.message);finish(this.failure);}if(m.kind==='configured'||m.kind==='ready'){
     const p=this.settings.acquisition_profile,legacy=!!m.legacy_profile_fixed,info=m.applied_configuration??m.firmware_info,b=Buffer.from(m.register_readback_base64??'','base64');this.observedConfiguration=m;
     try{
+     if(this.failure)throw this.failure;
      const settings=legacy&&p?this.settings.legacy_settings:this.settings;
      if(!settings)throw new AppError('RAW_CONFIG_UNSUPPORTED','旧FWでは標準profileのみ使用できます');
      if(info?.chirps!==c.chirps_per_frame||info?.rx!==c.rx_count||info?.samples!==c.samples_per_chirp||hash(b)!==m.register_readback_sha256)throw new AppError('RAW_CSK_READBACK_INVALID','実機rawのshape・読戻しhashが一致しません');
