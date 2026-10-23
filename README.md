@@ -1,4 +1,6 @@
-# レーダー収録・レビュー 0.6.0
+# レーダー収録・レビュー 0.7.0-rc.1
+
+**取得条件切替の候補版です。新FW radc-0.3.0は未書込み・実機未試験です。** [10プリセット・操作と制約](docs/ACQUISITION_PRESETS.md) / [実機適用前のレビュー](docs/ACQUISITION_FW_REVIEW.md)。[実機確認済みstable v0.6.0](https://github.com/baku1101/radar-recorder/releases/tag/v0.6.0)はそのまま利用できます。旧radc-0.2.0での標準取得も維持しています。
 
 個人PCでレーダーと動画を保存・確認するローカルアプリです。0.5.0ではKITCSKBGT60CUTR13TOBO1の実ADC FIFOを独自raw FWからUSB-UARTで読み、range FFT/STFTによるmicro-Dopplerをリアルタイム表示・保存・再生できます。従来の検出点表示・動画同期・日本語ラベル確認も保持しています。学習・FPGA接続は未実装です。
 

@@ -49,6 +49,13 @@
     <label>USBポート<input id="micro-port" value="COM10" pattern="COM[0-9]+" size="9"></label>
     <button id="micro-start" type="button" class="primary" disabled>接続して実raw表示・保存を開始</button><button id="micro-stop" type="button" class="secondary" disabled>raw取得/処理を停止</button>
   </div>
+  <details id="micro-acquisition"><summary>センサーの取得条件（対応プリセット）</summary>
+  <p class="notice small">新FW radc-0.3.0用の候補機能です。実機への書込み・新profileの取得試験はまだ行っていません。現在のradc-0.2.0では従来の標準取得を使えます。</p>
+  <div class="doppler-controls"><button id="micro-device-check" type="button" class="secondary">FW機能を確認（取得しない）</button><label>次の取得条件<select id="micro-profile" disabled><option value="japan-default">従来の標準条件</option></select></label></div>
+  <p id="micro-profile-state" role="status" class="small">未確認：取得条件の切替は無効です。FW確認は停止中にINFOだけを読み、設定・取得を開始しません。</p>
+  <p id="micro-profile-detail" class="small"></p><p id="micro-processing-adjustment" class="small" role="status"></p>
+  <p class="muted small">読戻し検証は非校正レジスタの一致までです。20校正領域の意味・可読性、全パラメータ依存の網羅、RF/時計精度、平均化変更時のADC振幅は未検証です。</p>
+  <p class="muted small">任意数値の自由入力、Tcとframe周期の独立変更、TX powerは未対応です。プリセットを選ぶとTc・frame周期・RF条件も連動します。以下のFFT/STFT設定はPC側の解析条件です。</p></details>
   <div id="micro-connection" class="message" role="status" aria-live="polite" data-phase="initializing">生ADC画面を初期化しています。変わらない場合はページを再読み込みしてください。</div>
   <details><summary>ローカルraw配信の入力設定</summary><label>raw配信URL<input id="micro-url" value="ws://127.0.0.1:8768"></label><label>raw_adc_header JSON<textarea id="micro-header" rows="4" placeholder="実設定・shape・sample timing・時計の出典を含むJSON。unknownから軸を推定しません。"></textarea></label></details>
   <details><summary>次回のFFT/STFT処理設定</summary><div class="doppler-controls"><label>窓長（chirp）<select id="micro-window"><option>16</option><option>32</option><option>64</option><option selected>128</option><option>256</option><option>512</option></select></label><label>hop（chirp）<input id="micro-hop" type="number" min="1" value="32"></label><label>距離の下限 m<input id="micro-rmin" type="number" min="0" step="0.01" value="0"></label><label>距離の上限 m<input id="micro-rmax" type="number" min="0" step="0.01" value="3"></label><label class="check"><input id="micro-static" type="checkbox">静止成分を除去</label></div><p class="muted small">処理設定は記録に保存します。センサー設定は変更しません。位相/物理方向は未校正です。</p></details>

@@ -1,0 +1,669 @@
+{
+  "schema_version": 1,
+  "protocol": "RADC_CONFIG_1",
+  "firmware": "radc-0.3.0",
+  "default_profile_id": "japan-default",
+  "profiles": [
+    {
+      "id": "japan-default",
+      "label": "標準 / 128 chirp・64 sample",
+      "profile_sha256": "60aa95836a7a9f1515bc794f0dbca37e16560281e3eb259fc866fae11e1365d3",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 64,
+          "chirps_per_frame": 128,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.000501225,
+          "carrier_hz": 60772770385.74219,
+          "chirp_slope_hz_per_s": 33691406250000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.09996143749999999,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60509977416.99219,
+          "sweep_end_hz": 60989658813.47656,
+          "sampling_start_hz": 60560514526.36719,
+          "sampling_stop_hz": 60985026245.11719,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "3ffa85d067fdfd65c154cdcdeca4a9af0337f764e6fa7fd7657efb868429cccb",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 8192,
+        "fifo_words": 4096,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 164543.452068704,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.0641568,
+        "sample_gap_s": 0.035804637499999986
+      },
+      "hardware_verified": false,
+      "requested_parameters": {},
+      "config_sha256": "dc95102e11b4ab34f7e680f64f789dfe32244fe7e62f21c6b11497c556914385"
+    },
+    {
+      "id": "short-frame",
+      "label": "短い観測 / 64 chirp",
+      "profile_sha256": "7fff0629907017fb489571f5070842f5c33e09fc4edac000812c8526c8e5fc1e",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 64,
+          "chirps_per_frame": 64,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.000501225,
+          "carrier_hz": 60772770385.74219,
+          "chirp_slope_hz_per_s": 33691406250000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.06788303749999998,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60509977416.99219,
+          "sweep_end_hz": 60989658813.47656,
+          "sampling_start_hz": 60560514526.36719,
+          "sampling_stop_hz": 60985026245.11719,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "b1d552a0df139e25779eea7e3067cf2666b2844b73c0ff401065422e9ee55c39",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 4096,
+        "fifo_words": 2048,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 121620.95722366581,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.0320784,
+        "sample_gap_s": 0.03580463749999998
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "nc": 64
+      },
+      "config_sha256": "00341191fcc3cced6e1cff4a1230031dd7c17c4da27b60fa9006b2bac8f78ede"
+    },
+    {
+      "id": "long-window",
+      "label": "長い観測 / 256 chirp・32 sample",
+      "profile_sha256": "eba1bd82cc5d471c9dc7c927940a8c808d5ffafbcf9a7e51ce7cf55c74aaae1a",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 32,
+          "chirps_per_frame": 256,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.00040062500000000005,
+          "carrier_hz": 60773630981.44531,
+          "chirp_slope_hz_per_s": 37744140625000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.13836463750000003,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60600007934.57031,
+          "sweep_end_hz": 60900073852.53906,
+          "sampling_start_hz": 60656624145.50781,
+          "sampling_stop_hz": 60890637817.38281,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "3ff43fa41f1ec6d34974be835bd17497224d9f0f4a6cf6afb27cb4e55590ee75",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 8192,
+        "fifo_words": 4096,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 118874.30413713906,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.10256000000000001,
+        "sample_gap_s": 0.035804637500000014
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "nc": 256,
+        "ns": 32,
+        "start": 60600000000,
+        "bw": 300000000
+      },
+      "config_sha256": "ca9453bfb9950894ba8d61414a2493333f374bab3b8751b0218e366033207e7d"
+    },
+    {
+      "id": "more-samples",
+      "label": "サンプル数128 / 32 chirp",
+      "profile_sha256": "ae697cca640df377cb8cc0aba3793eeb6e55dd63f1c3531bf68cac6e1d52883e",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 128,
+          "chirps_per_frame": 32,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.000707825,
+          "carrier_hz": 60760973510.74219,
+          "chirp_slope_hz_per_s": 17675781250000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.0584550375,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60509977416.99219,
+          "sweep_end_hz": 60989874877.92969,
+          "sampling_start_hz": 60536491088.86719,
+          "sampling_stop_hz": 60985455932.61719,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "505aa906c8a186aec59cbb9813589c0582e1d84a39b5ca4024ad9775a4a512b1",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 4096,
+        "fifo_words": 2048,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 141236.75825201548,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.0226504,
+        "sample_gap_s": 0.0358046375
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "ns": 128,
+        "nc": 32
+      },
+      "config_sha256": "79ba74eeeeda7711d1b3e92ee9f993ce6ac448b4bbe6630160bac9e5e5c983ea"
+    },
+    {
+      "id": "fewer-samples",
+      "label": "サンプル数32",
+      "profile_sha256": "91fff71c20d6607f69c69f1b81f86c9233192ebe1729cc902dc8435e01eb3650",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 32,
+          "chirps_per_frame": 128,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.00040062500000000005,
+          "carrier_hz": 60773630981.44531,
+          "chirp_slope_hz_per_s": 37744140625000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.08708463749999999,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60600007934.57031,
+          "sweep_end_hz": 60900073852.53906,
+          "sampling_start_hz": 60656624145.50781,
+          "sampling_stop_hz": 60890637817.38281,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "84d035b531122ec8d6433f3e0219dec89677bcfe0e04e76eb17c89f4c42da551",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 4096,
+        "fifo_words": 2048,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 94804.32183001279,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.051280000000000006,
+        "sample_gap_s": 0.035804637499999986
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "ns": 32,
+        "start": 60600000000,
+        "bw": 300000000
+      },
+      "config_sha256": "e48ddf1a627cd3c5e32f220277a2efd3276502eb403f971d79bfdb4f707ae5e7"
+    },
+    {
+      "id": "lower-sample-rate",
+      "label": "ADC 2.5 MHz",
+      "profile_sha256": "28f59d96be07c8aa857460e7671e839e6f6d4d2d0f631e568d8a52d73758f626",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 64,
+          "chirps_per_frame": 128,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 2500000,
+          "chirp_interval_s": 0.000707825,
+          "carrier_hz": 60759205932.61719,
+          "chirp_slope_hz_per_s": 17675781250000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.12640623750000005,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60509977416.99219,
+          "sweep_end_hz": 60989874877.92969,
+          "sampling_start_hz": 60536491088.86719,
+          "sampling_stop_hz": 60981920776.36719,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "43d55d0ece8c39edec28157d93275bafa73fc156455e1304aa6e6616999f17bf",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 8192,
+        "fifo_words": 4096,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 130120.16119853259,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.0906016,
+        "sample_gap_s": 0.03580463750000004
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "fs": 2500000
+      },
+      "config_sha256": "990c1a8fd0104cb9a1975d1a1f5ce6c0a2f96ca089f7c137f978761303e56187"
+    },
+    {
+      "id": "three-rx",
+      "label": "3 RX / 16 chirp",
+      "profile_sha256": "4af100e9679c97885425d91b7b567a74fa1c8392c0ae53525f65959639e830c8",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 64,
+          "chirps_per_frame": 16,
+          "rx_count": 3,
+          "rx_order": [
+            "rx1",
+            "rx2",
+            "rx3"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.000501225,
+          "carrier_hz": 60772770385.74219,
+          "chirp_slope_hz_per_s": 33691406250000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.043824237499999995,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60509977416.99219,
+          "sweep_end_hz": 60989658813.47656,
+          "sampling_start_hz": 60560514526.36719,
+          "sampling_stop_hz": 60985026245.11719,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "fe7d22c7925bd97a829d393e377a2e9d658b5e3f34562211a9a677b84a3c237c",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 3072,
+        "fifo_words": 1536,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 141656.77155249994,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.0080196,
+        "sample_gap_s": 0.03580463749999999
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "rx": [
+          1,
+          1,
+          1
+        ],
+        "nc": 16
+      },
+      "config_sha256": "ecb6fbbcb8e6f15d0b1f43ddf94eb432b01fccbe3704cb91c93b987b63288e39"
+    },
+    {
+      "id": "shorter-tc",
+      "label": "短いchirp間隔 / 平均化8",
+      "profile_sha256": "4c14750443c3b43864a51794e27c0315fae9c8dbc4ee6cf9c46d3c52e6ae3aaa",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 64,
+          "chirps_per_frame": 64,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.00036062500000000005,
+          "carrier_hz": 60772770385.74219,
+          "chirp_slope_hz_per_s": 33691406250000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 8,
+          "frame_period_s": 0.0588846375,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60509977416.99219,
+          "sweep_end_hz": 60989658813.47656,
+          "sampling_start_hz": 60560514526.36719,
+          "sampling_stop_hz": 60985026245.11719,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "unknown_for_changed_averaging"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "9b6c74ed1b88594406287f3fbf197fba73185c5adb38e8202cc7b267e8fe430d",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 4096,
+        "fifo_words": 2048,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 140206.34838755694,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.023080000000000003,
+        "sample_gap_s": 0.0358046375
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "avg": 8,
+        "nc": 64
+      },
+      "config_sha256": "23ec2dc1f09c7cd3bb26227e43d97a36f257695c0e40c761aec10bd5243f1140"
+    },
+    {
+      "id": "lower-gain",
+      "label": "受信gain 36 dB",
+      "profile_sha256": "2ed9223f86159bda1ec928941517777787c3423e0f622dc209cadf26f8166090",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 64,
+          "chirps_per_frame": 128,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.000501225,
+          "carrier_hz": 60772770385.74219,
+          "chirp_slope_hz_per_s": 33691406250000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.09996143749999999,
+          "if_gain_db": 36,
+          "sweep_start_hz": 60509977416.99219,
+          "sweep_end_hz": 60989658813.47656,
+          "sampling_start_hz": 60560514526.36719,
+          "sampling_stop_hz": 60985026245.11719,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "ebdf2d3ddab627fb0c55e8e7ddca97823a4bd18320938e3405dca52191f04b5a",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 8192,
+        "fifo_words": 4096,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 164543.452068704,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.0641568,
+        "sample_gap_s": 0.035804637499999986
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "gain": 36
+      },
+      "config_sha256": "1fb907dbd1790da996e0f2c4142c411a5dbf9c272eab2292ed5e9fca61197b96"
+    },
+    {
+      "id": "narrow-sweep",
+      "label": "狭いsweep / 300 MHz",
+      "profile_sha256": "3e9071054d643e8cbcf3034c88c6b80bd79f1f190f316f04f1267bd71de03aca",
+      "header": {
+        "kind": "raw_adc_header",
+        "schema_version": 1,
+        "config": {
+          "data_kind": "real_adc",
+          "sample_format": "uint16_le",
+          "layout": "chirp_sample_rx",
+          "samples_per_chirp": 64,
+          "chirps_per_frame": 128,
+          "rx_count": 1,
+          "rx_order": [
+            "rx1"
+          ],
+          "sample_rate_hz": 5000000,
+          "chirp_interval_s": 0.000501225,
+          "carrier_hz": 60764553833.00781,
+          "chirp_slope_hz_per_s": 21093750000000,
+          "sample_scale": 1,
+          "sample_offset": 0,
+          "adc_full_scale": 65535,
+          "provenance": "real",
+          "time_basis": "device_fifo_callback_clock_with_configured_chirp_spacing",
+          "averaging_factor": 16,
+          "frame_period_s": 0.09996143749999999,
+          "if_gain_db": 42,
+          "sweep_start_hz": 60600022583.00781,
+          "sweep_end_hz": 60900344848.63281,
+          "sampling_start_hz": 60631663208.00781,
+          "sampling_stop_hz": 60897444458.00781,
+          "storage_bits": 16,
+          "adc_full_scale_reference": "uint16 storage span; analog and averaging scale not calibrated",
+          "physical_frame_origin_uncertainty_s": "unknown",
+          "device": "KITCSKBGT60CUTR13TOBO1 / B-step only",
+          "timing_source": {
+            "reference": "offline official B-step parameter API; device readback required before START"
+          },
+          "sample_fractional_bits": "datasheet_12_plus_4_not_analog_calibration"
+        }
+      },
+      "readback_fingerprint": {
+        "register_count": 433,
+        "address_order_sha256": "b1b9e347ec1af07b16482fc041418f7fdf152c154185ed310eef2ebf9096d7d8",
+        "non_calibration_sha256": "7cabf7eec3768c9f1adcc8e798975ca7fd94e9b0511b74e0ea86987e98afc040",
+        "non_calibration_count": 413
+      },
+      "limits": {
+        "samples_total": 8192,
+        "fifo_words": 4096,
+        "packet_header_bytes": 64,
+        "uart_bytes_per_second": 164543.452068704,
+        "uart_budget_bytes_per_second": 170000,
+        "sample_observation_s": 0.0641568,
+        "sample_gap_s": 0.035804637499999986
+      },
+      "hardware_verified": false,
+      "requested_parameters": {
+        "start": 60600000000,
+        "bw": 300000000
+      },
+      "config_sha256": "27f32d3a6147d847f9b97476e6270aa53b57eb7b36679ecc82d635d32ec7cf25"
+    }
+  ],
+  "unsupported": [
+    "arbitrary independent parameter values",
+    "independent frame period / Tc; profile-coupled derived values only",
+    "TX power changes",
+    "cross-frame coherent STFT"
+  ],
+  "candidate_only": true,
+  "catalog_sha256": "1dab0e1dc1c6865c78eb61ac9f4db65a43e68c15624a64339287088499ac9ac6"
+}

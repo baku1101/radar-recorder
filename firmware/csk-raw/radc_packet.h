@@ -7,4 +7,6 @@ typedef void (*radc_write_fn)(const uint8_t *, size_t, const uint8_t *, size_t);
 void radc_emit(const uint16_t *samples, uint32_t sample_count,
                uint32_t packet_sequence, uint32_t callback_tick_ms,
                uint32_t queue_drops, radc_write_fn write_packet);
+void radc_emit_config(const uint16_t *samples,uint32_t count,uint32_t sequence,
+                     uint32_t tick,uint32_t drops,const char *config_sha256,radc_write_fn write_packet);
 #endif

@@ -1,3 +1,7 @@
+# Configuration candidate
+
+`main-config.c` + `radc_config.c` adds stopped-only presets (radc-0.3.0). It is built but not programmed or hardware tested. `main.c` retains the 0.2 fixed-profile build. See [candidate operation](../../docs/ACQUISITION_PRESETS.md) and [review before hardware use](../../docs/ACQUISITION_FW_REVIEW.md). Private generated register arrays and firmware binaries are not distributed.
+
 # CSK raw FIFO producer（独自実装）
 
 対象はKITCSKBGT60CUTR13TOBO1のCSK、PSoC6 CY8C624AFNI-S2D43、BGT60CUTR13AIPのB-step向けです。現物のレーダーstepは保存済みID_HW値と同梱定義の照合でBと識別できました。この成果物は独自FWの候補で、既存PC APIの適用可否とは別です。現FWの検出/追跡を置き換えるため、元dev FWのbackup・復元手順と具体的な作業範囲の確認が必要です。現在は[既存PC APIを優先して再確認](../../docs/PC_RAW_API_PATHS.md)し、書換えは保留しています。

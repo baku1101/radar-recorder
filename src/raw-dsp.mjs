@@ -9,7 +9,7 @@ export const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 export function validateRawConfig(config) {
   const c = structuredClone(config ?? {}), formats = { int16_le: 2, uint16_le: 2, float32_le: 4, complex64_le: 8 };
   if (!['real_adc', 'complex_iq'].includes(c.data_kind) || !formats[c.sample_format] || (c.data_kind === 'complex_iq') !== (c.sample_format === 'complex64_le')) fail('NOT_RAW_ADC', '実ADCまたは複素IQのsample_formatが必要です。検出点やFFTはraw ADC入力にできません');
-  if (c.layout !== 'chirp_rx_sample') fail('RAW_LAYOUT_REQUIRED', '配列順序chirp_rx_sampleを明示してください');
+  if (!['chirp_rx_sample','chirp_sample_rx'].includes(c.layout)) fail('RAW_LAYOUT_REQUIRED', '配列順序chirp_rx_sample / chirp_sample_rxを明示してください');
   if (!pow2(c.samples_per_chirp) || c.samples_per_chirp < 16 || c.samples_per_chirp > 1024 || !Number.isSafeInteger(c.chirps_per_frame) || c.chirps_per_frame < 16 || c.chirps_per_frame > 512 || !Number.isSafeInteger(c.rx_count) || c.rx_count < 1 || c.rx_count > 3) fail('RAW_SHAPE_INVALID', 'shapeはsample 16〜1024の2の冪、chirp 16〜512、RX 1〜3です');
   for (const name of ['sample_rate_hz', 'chirp_interval_s', 'carrier_hz', 'chirp_slope_hz_per_s', 'adc_full_scale']) if (!positive(c[name])) fail('RAW_TIMING_UNKNOWN', `${name}の実値・単位が必要です。unknownから軸を推定しません`);
   if (c.samples_per_chirp / c.sample_rate_hz > c.chirp_interval_s || !Number.isFinite(c.sample_scale) || !Number.isFinite(c.sample_offset)) fail('RAW_TIMING_INVALID', 'chirp時間・sample scale/offsetが不正です');
@@ -47,10 +47,13 @@ export function decodeRaw(bytes, c) {
   if (bytes.length !== c.frame_bytes) fail('RAW_BYTE_COUNT', `raw bytes ${bytes.length}がshapeの${c.frame_bytes}と一致しません`);
   const count = c.samples_per_chirp * c.chirps_per_frame * c.rx_count, re = new Float64Array(count), im = new Float64Array(count);
   for (let i = 0; i < count; i++) {
+    // Keep original wire bytes untouched. Canonicalize only the working array.
+    const sample=i%c.samples_per_chirp,rx=Math.floor(i/c.samples_per_chirp)%c.rx_count,chirp=Math.floor(i/(c.samples_per_chirp*c.rx_count));
+    const j=c.layout==='chirp_sample_rx'?(chirp*c.samples_per_chirp+sample)*c.rx_count+rx:i;
     let a, b = 0;
-    if (c.sample_format === 'complex64_le') { a = bytes.readFloatLE(i * 8); b = bytes.readFloatLE(i * 8 + 4); }
-    else if (c.sample_format === 'float32_le') a = bytes.readFloatLE(i * 4);
-    else a = c.sample_format === 'int16_le' ? bytes.readInt16LE(i * 2) : bytes.readUInt16LE(i * 2);
+    if (c.sample_format === 'complex64_le') { a = bytes.readFloatLE(j * 8); b = bytes.readFloatLE(j * 8 + 4); }
+    else if (c.sample_format === 'float32_le') a = bytes.readFloatLE(j * 4);
+    else a = c.sample_format === 'int16_le' ? bytes.readInt16LE(j * 2) : bytes.readUInt16LE(j * 2);
     if (!Number.isFinite(a) || !Number.isFinite(b)) fail('RAW_NONFINITE_SAMPLE', 'ADC/IQに非有限値があります');
     re[i] = (a - c.sample_offset) * c.sample_scale / c.adc_full_scale; im[i] = b * c.sample_scale / c.adc_full_scale;
   }

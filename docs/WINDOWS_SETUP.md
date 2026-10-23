@@ -1,5 +1,7 @@
 # Windows 10/11でのセットアップ
 
+取得条件切替候補0.7.0-rc.1も同じ専用runtimeで動作します。別フォルダへ配置し、[候補版手順](ACQUISITION_PRESETS.md)に従ってください。setupは新FWを導入しません。旧0.2では標準取得のみ有効で、新0.3の実機適用は未実施です。stable配布物を上書きしません。
+
 64bit x64版のWindows 10/11、Windows PowerShell 5.1、ChromeまたはEdgeを使います。別PCでは、**すでに `radc-0.2.0` を導入した同じKITCSKBGT60CUTR13TOBO1** をUSBで接続して使う手順です。通常の検出FWや新品キットへのFW導入を、このセットアップは行いません。
 
 ## 最初の3手順

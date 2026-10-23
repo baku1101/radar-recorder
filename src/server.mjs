@@ -1,3 +1,4 @@
+import {acquisitionCatalog} from './acquisition.mjs';
 import {enumeratePorts} from './ports.mjs';
 import http from 'node:http';
 import fs from 'node:fs';
@@ -55,12 +56,12 @@ function serveVideo(req, res, file, mime) {
   fs.createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
 }
 
-export async function createApp({ root = path.join(project, 'data', 'sessions'), port = 8765, delayMs = 10, storeOptions = {}, liveFactory, leaseMs, rawCskFactory, portEnumerator = enumeratePorts } = {}) {
+export async function createApp({ root = path.join(project, 'data', 'sessions'), port = 8765, delayMs = 10, storeOptions = {}, liveFactory, leaseMs, rawCskFactory, rawCskProbe, portEnumerator = enumeratePorts } = {}) {
   let monitor, raw;
   const store = new SessionStore(root, storeOptions), controller = new SessionController(store, { delayMs, liveFactory, leaseMs, canAcquireLive: () => !monitor?.busy && !raw?.busy });
   const recordingIdle=()=>!controller.liveReservation && ![...controller.runtime.values()].some(runtime=>runtime.live);
   monitor = new DetectionMonitor({ factory: liveFactory, leaseMs, canAcquire: () => recordingIdle() && !raw?.busy });
-  raw = new RawService(root,{...(rawCskFactory?{cskFactory:rawCskFactory}:{}),canAcquire:()=>recordingIdle()&&!monitor.busy,leaseMs});
+  raw = new RawService(root,{...(rawCskFactory?{cskFactory:rawCskFactory}:{}),...(rawCskProbe?{cskProbe:rawCskProbe}:{}),canAcquire:()=>recordingIdle()&&!monitor.busy,leaseMs});
   const recoveryProblems = controller.initialize(), token = randomUUID(), model = new VideoLabelAdapter(), startedAt=new Date().toISOString();
   let origin;
   const json = (res, body, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
@@ -73,9 +74,11 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
       if (!['GET', 'POST'].includes(req.method)) throw new AppError('METHOD_NOT_ALLOWED', '未対応の操作です', 405);
       if (req.method === 'POST' && req.headers['x-radar-token'] !== token) throw new AppError('LOCAL_TOKEN_REQUIRED', '画面を再読込みしてください', 403);
       const url = new URL(req.url, origin), parts = url.pathname.split('/').filter(Boolean);
+      if(req.method==='GET'&&url.pathname==='/api/raw/profiles')return json(res,acquisitionCatalog());
+      if(req.method==='POST'&&url.pathname==='/api/raw/device'){const body=await jsonBody(req);assertKeys(body,['port']);return json(res,await raw.probeDevice(body));}
       if(req.method==='GET'&&url.pathname==='/api/raw/ports')return json(res,await portEnumerator());
       if(req.method==='GET'&&url.pathname==='/api/raw')return json(res,{sessions:raw.list(),hardware:RAW_HARDWARE_STATUS});
-      if(req.method==='POST'&&url.pathname==='/api/raw/start'){const body=await jsonBody(req);assertKeys(body,['transport','url','header','processing','request_id','port']);return json(res,await raw.start(body));}
+      if(req.method==='POST'&&url.pathname==='/api/raw/start'){const body=await jsonBody(req);assertKeys(body,['transport','url','header','processing','request_id','port','profile_id']);return json(res,await raw.start(body));}
       if(req.method==='POST'&&url.pathname==='/api/raw/import'){let processing;if(url.searchParams.has('processing')){try{processing=JSON.parse(url.searchParams.get('processing'));}catch{throw new AppError('INVALID_JSON','processing JSON is invalid');}}fs.mkdirSync(raw.root,{recursive:true});const staged=path.join(raw.root,`upload-${randomUUID()}.tmp`);try{await upload(req,staged,64*1024*1024);return json(res,await raw.importFile(staged,processing));}finally{if(fs.existsSync(staged))fs.unlinkSync(staged);}}
       if(parts[0]==='api'&&parts[1]==='raw'&&parts[2]){
         const id=parts[2],action=parts[3];raw.get(id);
@@ -91,7 +94,7 @@ export async function createApp({ root = path.join(project, 'data', 'sessions'),
       }
       if (req.method === 'POST' && url.pathname === '/api/monitor/stop') { assertKeys(await jsonBody(req), []); return json(res, await monitor.stop()); }
       if (req.method === 'GET' && url.pathname === '/api/monitor') return json(res, monitor.view({ windowS: Number(url.searchParams.get('window_s') ?? 30), paused: url.searchParams.get('paused') === '1' }));
-      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { app:{id:'radar-recorder-local',version:APP_VERSION,started_at:startedAt},token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], detection_monitor: { implemented: true, recording: false, camera: false, axes: ['speed_mps', 'doppler_bin'], full_spectrum: false, limits: PLOT_LIMITS }, raw_port_enumeration: true, raw_micro_doppler: { implemented: true, inputs: ['raw_jsonl', 'synthetic_raw', 'local_websocket_raw_adc', 'csk_raw_uart'], hardware: RAW_HARDWARE_STATUS, cross_frame_stitching: false }, camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
+      if (req.method === 'GET' && url.pathname === '/api/bootstrap') return json(res, { app:{id:'radar-recorder-local',version:APP_VERSION,started_at:startedAt},token, capabilities: { ...new JsonlFileAdapter('').capabilities(), live_capture: true, live_sources: ['csk_uart_installed_vendor_api', 'local_websocket_events'], detection_monitor: { implemented: true, recording: false, camera: false, axes: ['speed_mps', 'doppler_bin'], full_spectrum: false, limits: PLOT_LIMITS }, raw_acquisition_presets: {implemented:true,firmware_required:'radc-0.3.0',candidate_only:true,probe_required:true}, raw_port_enumeration: true, raw_micro_doppler: { implemented: true, inputs: ['raw_jsonl', 'synthetic_raw', 'local_websocket_raw_adc', 'csk_raw_uart'], hardware: RAW_HARDWARE_STATUS, cross_frame_stitching: false }, camera_capture: true, device_configuration: false, autonomous_csk_uart_start: false, capture_limits: CAPTURE_LIMITS, auto_label: model.capabilities(), max_upload_bytes: MAX_UPLOAD }, ...store.list(), recovery_problems: recoveryProblems, runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'GET' && url.pathname === '/api/sessions') return json(res, { ...store.list(), runtime_failure: controller.lastFailure ?? null });
       if (req.method === 'POST' && url.pathname === '/api/sessions') {
         const body = await jsonBody(req);
