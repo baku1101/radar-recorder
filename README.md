@@ -1,4 +1,6 @@
-# レーダー収録・レビュー 0.7.0-rc.1
+# レーダー収録・レビュー 0.7.0-rc.2
+
+Windows登録済みproxyで407になる場合は `setup.cmd -UseSystemProxy -ProxyUseDefaultCredentials` を使えます。パスワード保存やOS設定変更は行いません。[proxy設定](docs/WINDOWS_SETUP.md#proxy)を参照してください。
 
 **取得条件切替の候補版です。新FW radc-0.3.0は未書込み・実機未試験です。** [10プリセット・操作と制約](docs/ACQUISITION_PRESETS.md) / [実機適用前のレビュー](docs/ACQUISITION_FW_REVIEW.md)。[実機確認済みstable v0.6.0](https://github.com/baku1101/radar-recorder/releases/tag/v0.6.0)はそのまま利用できます。旧radc-0.2.0での標準取得も維持しています。
 

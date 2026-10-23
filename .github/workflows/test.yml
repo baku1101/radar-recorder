@@ -22,3 +22,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: powershell
         run: ./test/windows-setup.ps1
+
+      - name: Loopback proxy policy and 407 regression
+        if: runner.os == 'Windows'
+        run: node test/setup-network.mjs

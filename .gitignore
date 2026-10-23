@@ -16,3 +16,5 @@ test/check-existing-evidence.mjs
 
 __pycache__/
 *.pyc
+
+setup-network.local.json
